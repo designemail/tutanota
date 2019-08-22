@@ -8,6 +8,7 @@ import type {AccountingInfo} from "../entities/sys/AccountingInfo"
 import type {EmailSenderListElement} from "../entities/sys/EmailSenderListElement"
 import type {CertificateInfo} from "../entities/sys/CertificateInfo"
 import type {UserSettingsGroupRoot} from "../entities/tutanota/UserSettingsGroupRoot"
+import type {CalendarEventAttendee} from "../entities/tutanota/CalendarEventAttendee"
 
 export const reverse = (objectMap: Object) => Object.keys(objectMap)
                                                     .reduce((r, k) => Object.assign(r, {[objectMap[k]]: k}), {})
@@ -645,3 +646,31 @@ export const MailReportType = Object.freeze({
 	SPAM: "1",
 })
 export type MailReportTypeEnum = $Values<typeof MailReportType>
+export const CalendarAttendeeStatus = Object.freeze({
+	/** invite is not sent yet */
+	ADDED: "0",
+	/** already invited but did not respond */
+	NEEDS_ACTION: "1",
+	ACCEPTED: "2",
+	DECLINED: "3",
+	TENTATIVE: "4"
+})
+
+export type CalendarAttendeeStatusEnum = $Values<typeof CalendarAttendeeStatus>
+
+export function getAttendeeStatus(attendee: CalendarEventAttendee): CalendarAttendeeStatusEnum {
+	return downcast(attendee.status)
+}
+
+export const CalendarMethod = Object.freeze({
+	PUBLISH: "PUBLISH",
+	REQUEST: "REQUEST",
+	REPLY: "REPLY",
+	ADD: "ADD",
+	CANCEL: "CANCEL",
+	REFRESH: "REFRESH",
+	COUNTER: "COUNTER",
+	DECLINECOUNTER: "DECLINECOUNTER"
+})
+
+export type CalendarMethodEnum = $Values<typeof CalendarMethod>

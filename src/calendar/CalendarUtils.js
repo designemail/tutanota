@@ -1,8 +1,15 @@
 //@flow
-import {getStartOfDay, incrementDate} from "../api/common/utils/DateUtils"
+import {getStartOfDay, incrementDate, isSameDay} from "../api/common/utils/DateUtils"
 import {pad} from "../api/common/utils/StringUtils"
-import type {EventTextTimeOptionEnum, RepeatPeriodEnum, ShareCapabilityEnum, WeekStartEnum} from "../api/common/TutanotaConstants"
+import type {
+	CalendarAttendeeStatusEnum,
+	EventTextTimeOptionEnum,
+	RepeatPeriodEnum,
+	ShareCapabilityEnum,
+	WeekStartEnum
+} from "../api/common/TutanotaConstants"
 import {
+	CalendarAttendeeStatus,
 	defaultCalendarColor,
 	EventTextTimeOption,
 	getWeekStart,
@@ -12,17 +19,17 @@ import {
 } from "../api/common/TutanotaConstants"
 import {DateTime} from "luxon"
 import {clone, neverNull} from "../api/common/utils/Utils"
+import type {CalendarRepeatRule} from "../api/entities/tutanota/CalendarRepeatRule"
 import {createCalendarRepeatRule} from "../api/entities/tutanota/CalendarRepeatRule"
 import {DAYS_SHIFTED_MS, generateEventElementId, isAllDayEvent} from "../api/common/utils/CommonCalendarUtils"
 import {lang} from "../misc/LanguageViewModel"
-import {formatTime} from "../misc/Formatter"
+import {formatDate, formatDateTime, formatTime} from "../misc/Formatter"
 import {size} from "../gui/size"
 import {assertMainOrNode} from "../api/Env"
 import {logins} from "../api/main/LoginController"
 import {isSameId} from "../api/common/EntityFunctions"
 import {getFromMap} from "../api/common/utils/MapUtils"
 import type {CalendarEvent} from "../api/entities/tutanota/CalendarEvent"
-import type {CalendarRepeatRule} from "../api/entities/tutanota/CalendarRepeatRule"
 import type {GroupInfo} from "../api/entities/sys/GroupInfo"
 import type {CalendarGroupRoot} from "../api/entities/tutanota/CalendarGroupRoot"
 import type {User} from "../api/entities/sys/User"
@@ -32,6 +39,7 @@ import type {GroupMembership} from "../api/entities/sys/GroupMembership"
 assertMainOrNode()
 
 export const CALENDAR_EVENT_HEIGHT = size.calendar_line_height + 2
+export const CALENDAR_MIME_TYPE = "text/calendar"
 
 export type CalendarMonthTimeRange = {
 	start: Date,
@@ -100,7 +108,11 @@ export function parseTime(timeString: string): ?{hours: number, minutes: number}
 	return {hours, minutes}
 }
 
-export function filterInt(value: string) {
+/**
+ * Stricter version of parseInt() from MDN. parseInt() allows some arbitrary characters at the end of the string.
+ * Returns NaN in case there's anything non-number in the string.
+ */
+export function filterInt(value: string): number {
 	if (/^\d+$/.test(value)) {
 		return parseInt(value, 10);
 	} else {
@@ -111,6 +123,11 @@ export function filterInt(value: string) {
 
 export function timeString(date: Date, amPm: boolean): string {
 	return timeStringFromParts(date.getHours(), date.getMinutes(), amPm)
+}
+
+export function timeStringInZone(date: Date, amPm: boolean, zone: string): string {
+	const {hour, minute} = DateTime.fromJSDate(date, {zone})
+	return timeStringFromParts(hour, minute, amPm)
 }
 
 export function timeStringFromParts(hours: number, minutes: number, amPm: boolean): string {
@@ -490,7 +507,7 @@ export function isLongEvent(event: CalendarEvent, zone: string): boolean {
 	return getEventEnd(event, zone).getTime() - getEventStart(event, zone).getTime() > DAYS_SHIFTED_MS
 }
 
-export function createEventId(event: CalendarEvent, zone: string, groupRoot: CalendarGroupRoot): void {
+export function assignEventId(event: CalendarEvent, zone: string, groupRoot: CalendarGroupRoot): void {
 	const listId = event.repeatRule || isLongEvent(event, zone) ? groupRoot.longEvents : groupRoot.shortEvents
 	event._id = [listId, generateEventElementId(event.startTime.getTime())]
 }
@@ -537,4 +554,63 @@ export function isSameEvent(left: CalendarEvent, right: CalendarEvent): boolean 
 export function hasAlarmsForTheUser(event: CalendarEvent): boolean {
 	const useAlarmList = neverNull(logins.getUserController().user.alarmInfoList).alarms
 	return event.alarmInfos.some(([listId]) => isSameId(listId, useAlarmList))
+}
+
+export function formatEventDuration(event: CalendarEvent, zone: string) {
+	const startTime = getEventStart(event, zone)
+	const endTime = getEventEnd(event, zone)
+	if (isAllDayEvent(event)) {
+		const startString = formatDate(startTime)
+		if (getDiffInDays(endTime, startTime) === 1) {
+			return startString
+		} else {
+			return `${startString} - ${formatDate(endTime)}`
+		}
+	} else {
+		const startString = formatDateTime(startTime)
+		let endString
+		if (isSameDay(startTime, endTime)) {
+			endString = formatTime(endTime)
+		} else {
+			endString = formatDateTime(endTime)
+		}
+		return `${startString} - ${endString}`
+	}
+}
+
+export function calendarAttendeeStatusSymbol(status: CalendarAttendeeStatusEnum): string {
+	switch (status) {
+		case CalendarAttendeeStatus.ADDED:
+		case CalendarAttendeeStatus.NEEDS_ACTION:
+			return ""
+		case CalendarAttendeeStatus.TENTATIVE:
+			return "?"
+		case CalendarAttendeeStatus.ACCEPTED:
+			return "✓"
+		case CalendarAttendeeStatus.DECLINED:
+			return "❌"
+		default:
+			throw new Error("Unknown calendar attendee status: " + status)
+	}
+}
+
+export function calendarAttendeeStatusDescription(status: CalendarAttendeeStatusEnum): string {
+	switch (status) {
+		case CalendarAttendeeStatus.ADDED:
+		case CalendarAttendeeStatus.NEEDS_ACTION:
+			return lang.get("awaiting_label")
+		case CalendarAttendeeStatus.TENTATIVE:
+			return lang.get("maybe_label")
+		case CalendarAttendeeStatus.ACCEPTED:
+			return lang.get("yes_label")
+		case CalendarAttendeeStatus.DECLINED:
+			return lang.get("no_label")
+		default:
+			throw new Error("Unknown calendar attendee status: " + status)
+	}
+}
+
+export function incrementSequence(sequence: string): string {
+	const current = filterInt(sequence) || 0
+	return String(current + 1)
 }

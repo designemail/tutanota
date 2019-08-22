@@ -4,7 +4,7 @@ import {aes128RandomKey} from "../crypto/Aes"
 import {load, loadRoot, serviceRequest, serviceRequestVoid} from "../EntityWorker"
 import {TutanotaService} from "../../entities/tutanota/Services"
 import type {LoginFacade} from "./LoginFacade"
-import type {ConversationTypeEnum, ReportedMailFieldTypeEnum} from "../../common/TutanotaConstants"
+import type {CalendarMethodEnum, ConversationTypeEnum, ReportedMailFieldTypeEnum} from "../../common/TutanotaConstants"
 import {
 	GroupType,
 	MailAuthenticationStatus as MailAuthStatus,
@@ -24,7 +24,8 @@ import {createDraftUpdateData} from "../../entities/tutanota/DraftUpdateData"
 import {DraftUpdateReturnTypeRef} from "../../entities/tutanota/DraftUpdateReturn"
 import type {SendDraftData} from "../../entities/tutanota/SendDraftData"
 import {createSendDraftData} from "../../entities/tutanota/SendDraftData"
-import {isExternalSecureRecipient, recipientInfoType} from "../../common/RecipientInfo"
+import type {RecipientInfo} from "../../common/RecipientInfo"
+import {isExternalSecureRecipient, RecipientInfoType} from "../../common/RecipientInfo"
 import {RecipientsNotFoundError} from "../../common/error/RecipientsNotFoundError"
 import {generateKeyFromPassphrase, generateRandomSalt} from "../crypto/Bcrypt"
 import {KeyLength} from "../crypto/CryptoConstants"
@@ -59,6 +60,7 @@ import {encryptBucketKeyForInternalRecipient} from "./ReceipientKeyDataUtils"
 import murmurHash from "../crypto/lib/murmurhash3_32"
 import type {EntityUpdate} from "../../entities/sys/EntityUpdate"
 import type {PhishingMarker} from "../../entities/tutanota/PhishingMarker"
+import {createCalendarFileMethod} from "../../entities/tutanota/CalendarFileMethod"
 
 assertWorkerOrNode()
 
@@ -268,7 +270,7 @@ export class MailFacade {
 		return attachment
 	}
 
-	sendDraft(draft: Mail, recipientInfos: RecipientInfo[], language: string): Promise<void> {
+	sendDraft(draft: Mail, recipientInfos: RecipientInfo[], language: string, calendarMethods: Array<[IdTuple, CalendarMethodEnum]>): Promise<void> {
 		return getMailGroupIdForMailAddress(this._login.getLoggedInUser(), draft.sender.address)
 			.then(senderMailGroupId => {
 				let bucketKey = aes128RandomKey()
@@ -297,6 +299,10 @@ export class MailFacade {
 						}),
 						resolveSessionKey(MailTypeModel, draft).then(mailSessionkey => {
 							let sk = neverNull(mailSessionkey)
+							service.calendarMethods = calendarMethods.map(([file, method]) => {
+								const mailEncMethod = encryptString(sk, method)
+								return createCalendarFileMethod({file, mailEncMethod})
+							})
 							if (draft.confidential) {
 								service.bucketEncMailSessionKey = encryptKey(bucketKey, sk)
 								if (recipientInfos.find(r => isExternalSecureRecipient(r)) != null) {
@@ -370,7 +376,7 @@ export class MailFacade {
 
 				// copy password information if this is an external contact
 				// otherwise load the key information from the server
-				if (recipientInfo.type === recipientInfoType.external && recipientInfo.contact) {
+				if (recipientInfo.type === RecipientInfoType.EXTERNAL && recipientInfo.contact) {
 					let password = recipientInfo.contact.presharedPassword
 
 					if (password == null && recipientInfo.contact.autoTransmitPassword !== "") {

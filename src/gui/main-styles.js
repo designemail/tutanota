@@ -118,6 +118,9 @@ styles.registerStyle('main', () => {
 		'button': {
 			'background': 'transparent', // removes default browser style for buttons
 		},
+		'button:disabled': {
+			cursor: "default"
+		},
 		'body, button': { // Yes we have to tell buttons separately because browser button styles override general body ones
 			overflow: 'hidden',
 			// see: https://www.smashingmagazine.com/2015/11/using-system-ui-fonts-practical-guide/ and github
@@ -235,6 +238,7 @@ styles.registerStyle('main', () => {
 		'.mr-button': {'margin-right': px(size.hpad_button)},
 
 		'.mt-negative-s': {'margin-top': px(-size.hpad_button)},
+		'.mt-negative-m': {'margin-top': px(-size.vpad)},
 		'.mr-negative-s': {'margin-right': px(-size.hpad_button)},
 		'.ml-negative-s': {'margin-left': px(-size.hpad_button)}, // negative margin to handle the default padding of a button
 		'.ml-negative-l': {'margin-left': px(-size.hpad_large)},
@@ -251,6 +255,7 @@ styles.registerStyle('main', () => {
 		'.text-prewrap': {'white-space': 'pre-wrap'},
 		'.text-preline': {'white-space': 'pre-line'},
 		'.text-pre': {'white-space': 'pre'},
+		'.line-break-anywhere': {'line-break': 'anywhere'},
 		'.z1': {'z-index': '1'},
 		'.z2': {'z-index': '2'},
 		'.z3': {'z-index': '3'},
@@ -359,7 +364,6 @@ styles.registerStyle('main', () => {
 		'.left': {'text-align': 'left'},
 		'.statusTextColor': {color: theme.content_accent},
 		'.button-height': {height: px(size.button_height)},
-		'.button-height-accent': {height: px(size.button_height_accent) + " !important"},
 		'.button-min-height': {'min-height': px(size.button_height)},
 		'.button-width-fixed': {width: px(size.button_height)},
 		'.large-button-height': {height: px(size.button_floating_size)},
@@ -391,6 +395,7 @@ styles.registerStyle('main', () => {
 		'.flex-third-middle': {flex: '2 1 0'}, // take up more space for the middle column
 		'.flex-half': {flex: '0 0 50%'}, // splits a flex layout into two same width columns
 		'.flex-grow-shrink-half': {flex: '1 1 50%'},
+		'.flex-nogrow-shrink-half': {flex: '0 1 50%'},
 		'.flex-grow-shrink-auto': {flex: "1 1 auto"}, // allow element to grow and shrink using the elements width as default size.
 		'.flex-grow-shrink-150': {flex: "1 1 150px"},
 		'.flex-no-shrink': {flex: "1 0 0"},
@@ -406,6 +411,7 @@ styles.registerStyle('main', () => {
 		'.items-start': {'align-items': 'flex-start'},
 		'.items-base': {'align-items': 'baseline'},
 		'.items-stretch': {'align-items': 'stretch'},
+		'.align-self-start': {'align-self': 'start'},
 		'.align-self-center': {'align-self': 'center'},
 		'.align-self-end': {'align-self': 'flex-end'},
 		'.align-self-stretch': {'align-self': 'stretch'},
@@ -1160,6 +1166,10 @@ styles.registerStyle('main', () => {
 			width: px(100)
 		},
 
+		'.calendar-invite-field': {
+			'min-width': '80px',
+		},
+
 		'button.floating': {
 			'border-radius': '50%',
 			'box-shadow': `0 3px 5px -1px rgba(0,0,0,.2), 0 6px 10px 0 rgba(0,0,0,.14), 0 1px 18px 0 rgba(0,0,0,.12)`,
@@ -1170,6 +1180,19 @@ styles.registerStyle('main', () => {
 		'button.floating:active': {
 			'box-shadow': '0 7px 8px -4px rgba(0,0,0,.2),0 12px 17px 2px rgba(0,0,0,.14),0 5px 22px 4px rgba(0,0,0,.12)'
 		},
+
+		'.block-list': {
+			'list-style': 'none',
+			padding: 0,
+		},
+
+		'.block-list li': {
+			display: 'block',
+		},
+		'.sticky': {
+			position: 'sticky'
+		},
+
 
 		// media query for small devices where elements should be arranged in one column
 		// also adaptions for table column widths
@@ -1256,6 +1279,13 @@ styles.registerStyle('main', () => {
 		'.mobile .header-right': {
 			left: 'auto',
 			width: `${px(size.navbar_edge_width_mobile)}`
+		},
+		'.menu-shadow': {
+			"box-shadow": "0 4px 5px 2px rgba(0,0,0,0.14), 0 4px 5px 2px rgba(0,0,0,0.14), 0 4px 5px 2px rgba(0,0,0,0.14)",
+		},
+		'.big-input input': {
+			'font-size': px(size.font_size_base * 1.4),
+			'line-height': `${px(size.font_size_base * 1.4 + 2)} !important`,
 		},
 
 		// media query for mobile devices, should be one pixel less than style.isDesktopLayout

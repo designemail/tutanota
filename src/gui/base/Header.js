@@ -71,18 +71,21 @@ class Header {
 			]))
 		}
 
-		asyncImport(typeof module !== "undefined" ?
-			module.id : __moduleName, `${env.rootPathPrefix}src/search/SearchBar.js`)
-			.then((searchBarModule) => {
-				this.searchBar = new searchBarModule.SearchBar()
-			})
 
 		asyncImport(typeof module !== "undefined" ?
 			module.id : __moduleName, `${env.rootPathPrefix}src/api/main/WorkerClient.js`)
 			.then(workerClientModule => {
-				(workerClientModule.worker: WorkerClient).wsConnection().map(state => {
+				const worker = (workerClientModule.worker: WorkerClient)
+				worker.wsConnection().map(state => {
 					this._wsState = state
 					m.redraw()
+				})
+				worker.initialized.then(() => {
+					asyncImport(typeof module !== "undefined" ?
+						module.id : __moduleName, `${env.rootPathPrefix}src/search/SearchBar.js`)
+						.then((searchBarModule) => {
+							this.searchBar = new searchBarModule.SearchBar()
+						})
 				})
 			})
 	}

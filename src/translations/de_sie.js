@@ -1123,6 +1123,8 @@ module.exports = {
 		"yourFolders_action": "Ihre ORDNER",
 		"yourMessage_label": "Ihre Nachricht",
 		"couldNotAuthU2f_msg": "Es konnte nicht mit dem Sicherheitsschlüssel authentifiziert werden.",
-		"waitingForU2f_msg": "Warten auf den Sicherheitsschlüssel…"
+		"waitingForU2f_msg": "Warten auf den Sicherheitsschlüssel…",
+		"attendingEvent_label": "Teilnehmen?",
+		"eventCopy_msg": "Diese Erinnerung wurde von einem anderen Kalender gesendet. Änderungen sind nur in Ihre Kopie sichtbar.",
 	}
 }

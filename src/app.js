@@ -27,8 +27,11 @@ import {Logger, replaceNativeLogger} from "./api/common/Logger"
 import {ButtonType} from "./gui/base/ButtonN"
 import {changeSystemLanguage} from "./native/SystemApp"
 
+console.log("app.js everything imported")
+
 assertMainOrNodeBoot()
 bootFinished()
+console.log("app.js boot finished")
 
 replaceNativeLogger(window, new Logger())
 
@@ -57,6 +60,7 @@ window.tutao = {
 	Const,
 	locator: window.tutao ? window.tutao.locator : null // locator is not restored on hot reload otherwise
 }
+setupExceptionHandling()
 
 function _asyncImport(path: string) {
 	return asyncImport(typeof module !== "undefined" ? module.id : __moduleName, `${env.rootPathPrefix}${path}`)
@@ -65,7 +69,6 @@ function _asyncImport(path: string) {
 
 client.init(navigator.userAgent, navigator.platform)
 
-_asyncImport("src/serviceworker/ServiceWorkerClient.js").then((swModule) => swModule.init())
 if (client.isIE()) {
 	_asyncImport("src/gui/base/NotificationOverlay.js").then((module) => module.show({
 		view: () => m("", lang.get("unsupportedBrowserOverlay_msg"))
@@ -247,12 +250,13 @@ let initialized = lang.init(en).then(() => {
 
 	const workerPromise = _asyncImport("src/api/main/WorkerClient.js")
 		.then(module => module.worker)
-	workerPromise.then(() => {
+	workerPromise.then((worker) => {
+		console.log("app.js worker imported")
+		worker.initialized.then(() => console.log("worker initialized"))
 		_asyncImport("src/gui/InfoMessageHandler.js")
 	})
 
 
-	setupExceptionHandling()
 })
 
 function forceLogin(args: {[string]: string}, requestedPath: string) {

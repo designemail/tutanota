@@ -1127,6 +1127,8 @@ module.exports = {
 		"howCanWeHelp_title": "Wie können wir helfen?",
 		"describeProblem_msg": "Bitte gib deine Frage ein",
 		"noSolution_msg": "Du hast keine Lösung zu deinem Problem gefunden?",
-		"contactSupport_action": "Support kontaktieren"
+		"contactSupport_action": "Support kontaktieren",
+		"attendingEvent_label": "Teilnehmen?",
+		"eventCopy_msg": "Diese Erinnerung wurde von einem anderen Kalender gesendet. Änderungen sind nur in deine Kopie sichtbar.",
 	}
 }

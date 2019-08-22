@@ -21,10 +21,12 @@ import type {DialogHeaderBarAttrs} from "./DialogHeaderBar"
 import {DialogHeaderBar} from "./DialogHeaderBar"
 import type {TextFieldAttrs} from "./TextFieldN"
 import {TextFieldN, Type} from "./TextFieldN"
+import type {SelectorItemList} from "./DropDownSelectorN"
 import {DropDownSelectorN} from "./DropDownSelectorN"
 import {showProgressDialog} from "./ProgressDialog"
 import {Keys} from "../../api/common/TutanotaConstants"
 import {dialogAttrs} from "../../api/common/utils/AriaUtils"
+import {styles} from "../styles"
 
 assertMainOrNode()
 
@@ -82,7 +84,8 @@ export class Dialog {
 			},
 		]
 		this.view = (): VirtualElement => {
-			let mobileMargin = px(size.hpad)
+			let marginPx = px(size.hpad)
+			const sidesMargin = styles.bodyWidth > 800 || dialogType !== DialogType.EditLarge ? marginPx : 0
 			return m(this._getDialogWrapperStyle(dialogType), {
 					style: {
 						paddingTop: requiresStatusBarHack() ? '20px' : 'env(safe-area-inset-top)'
@@ -92,12 +95,12 @@ export class Dialog {
 				m(".flex.justify-center.align-self-stretch.rel.overflow-hidden"
 					+ (dialogType === DialogType.EditLarge ? ".flex-grow" : ".transition-margin"), {  // controls horizontal alignment
 						style: {
-							'margin-top': mobileMargin,
-							'margin-left': mobileMargin,
-							'margin-right': mobileMargin,
+							'margin-top': sidesMargin,
+							marginLeft: sidesMargin,
+							marginRight: sidesMargin,
 							'margin-bottom': (Dialog._keyboardHeight > 0)
 								? px(Dialog._keyboardHeight)
-								: dialogType === DialogType.EditLarge ? 0 : mobileMargin,
+								: dialogType === DialogType.EditLarge ? 0 : marginPx,
 						},
 					}, m(this._getDialogStyle(dialogType) + dialogAttrs("dialog-title", "dialog-message"), {
 						onclick: (e: MouseEvent) => e.stopPropagation(), // do not propagate clicks on the dialog as the Modal expects all propagated clicks to be clicks on the background
@@ -369,6 +372,38 @@ export class Dialog {
 		})
 	}
 
+	static alert(messageIdOrMessageFunction: TranslationKey | lazy<string>, buttons: $ReadOnlyArray<ButtonAttrs>,
+	             onclose?: (positive: boolean) => mixed
+	): Dialog {
+		let dialog: Dialog
+		const closeAction = (positive) => {
+			dialog.close()
+			setTimeout(() => onclose && onclose(positive), DefaultAnimationTime)
+		}
+
+		dialog = new Dialog(DialogType.Alert, {
+			view: () => [
+				m("#dialog-message.dialog-contentButtonsBottom.text-break.text-prewrap.selectable",
+					lang.getMaybeLazy(messageIdOrMessageFunction)),
+				m(".flex-center.dialog-buttons", buttons.map(a => m(ButtonN, a)))
+			]
+		}).setCloseHandler(() => closeAction(false))
+		  .addShortcut({
+			  key: Keys.ESC,
+			  shift: false,
+			  exec: () => closeAction(false),
+			  help: "cancel_action"
+		  })
+		  .addShortcut({
+			  key: Keys.RETURN,
+			  shift: false,
+			  exec: () => closeAction(true),
+			  help: "ok_action",
+		  })
+		  .show()
+		return dialog
+	}
+
 	// used in admin client
 	static save(title: lazy<string>, saveAction: action, child: Component): Promise<void> {
 		return new Promise(resolve => {
@@ -590,7 +625,9 @@ export class Dialog {
 	 * @param dropdownWidth width of the dropdown
 	 * @returns A promise resolving to the selected item. The returned promise is only resolved if "ok" is clicked.
 	 */
-	static showDropDownSelectionDialog<T>(titleId: TranslationKey, label: TranslationKey, infoMsgId: ?TranslationKey, items: {name: string, value: T}[], selectedValue: Stream<T>, dropdownWidth: ?number): Promise<T> {
+	static showDropDownSelectionDialog<T>(titleId: TranslationKey, label: TranslationKey, infoMsgId: ?TranslationKey,
+	                                      items: SelectorItemList<T>, selectedValue: Stream<T>, dropdownWidth: ?number
+	): Promise<T> {
 		return new Promise(resolve => {
 			Dialog.showActionDialog({
 				title: lang.get(titleId),

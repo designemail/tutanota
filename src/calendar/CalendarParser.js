@@ -20,9 +20,15 @@ import {
 	StringIterator
 } from "../misc/parsing"
 import WindowsZones from "./WindowsZones"
+import type {ParsedCalendarData} from "./CalendarImporter"
+import {parstatToCalendarAttendeeStatus} from "./CalendarImporter"
+import {createCalendarEventAttendee} from "../api/entities/tutanota/CalendarEventAttendee"
+import {createMailAddress} from "../api/entities/tutanota/MailAddress"
+import {filterInt} from "./CalendarUtils"
 import type {CalendarEvent} from "../api/entities/tutanota/CalendarEvent"
 import type {AlarmInfo} from "../api/entities/sys/AlarmInfo"
 import type {RepeatRule} from "../api/entities/sys/RepeatRule"
+import {createEncryptedMailAddress} from "../api/entities/tutanota/EncryptedMailAddress"
 
 function parseDateString(dateString: string): {year: number, month: number, day: number} {
 	const year = parseInt(dateString.slice(0, 4))
@@ -355,10 +361,15 @@ function oneDayDurationEnd(startTime: Date, allDay: boolean, tzId: ?string, zone
 	               .toJSDate()
 }
 
-export function parseCalendarEvents(icalObject: ICalObject, zone: string): Array<{event: CalendarEvent, alarms: Array<AlarmInfo>}> {
+export function parseCalendarEvents(icalObject: ICalObject, zone: string): ParsedCalendarData {
+	const methodProp = icalObject.properties.find((prop) => prop.name === "METHOD")
+	if (!methodProp) {
+		throw new ParserError("METHOD is not defined on the calendar")
+	}
+	const method = methodProp.value
 	const eventObjects = icalObject.children.filter((obj) => obj.type === "VEVENT")
 
-	return eventObjects.map((eventObj) => {
+	const contents = eventObjects.map((eventObj) => {
 		const event = createCalendarEvent()
 		const startProp = getProp(eventObj, "DTSTART")
 		if (typeof startProp.value !== "string") throw new ParserError("DTSTART value is not a string")
@@ -409,6 +420,16 @@ export function parseCalendarEvents(icalObject: ICalObject, zone: string): Array
 			if (typeof descriptionProp.value !== "string") throw new ParserError("DESCRIPTION value is not a string")
 			event.description = descriptionProp.value
 		}
+		const sequenceProp = eventObj.properties.find(p => p.name === "SEQUENCE")
+		if (sequenceProp) {
+			const sequenceNumber = filterInt(sequenceProp.value)
+			if (Number.isNaN(sequenceNumber)) {
+				throw new ParserError("SEQUENCE value is not a number")
+			}
+			// Convert it back to NumberString. Could use original one but this feels more robust.
+			event.sequence = String(sequenceNumber)
+		}
+
 		const alarms = []
 		eventObj.children.forEach((alarmChild) => {
 			if (alarmChild.type === "VALARM") {
@@ -416,9 +437,36 @@ export function parseCalendarEvents(icalObject: ICalObject, zone: string): Array
 				if (newAlarm) alarms.push(newAlarm)
 			}
 		})
+
+		let attendees = []
+		eventObj.properties.forEach((property) => {
+			if (property.name === "ATTENDEE") {
+				if (!property.value.startsWith("mailto:")) return
+				const status = parstatToCalendarAttendeeStatus[property.params["PARSTAT"]]
+				if (!status) return
+
+				attendees.push(createCalendarEventAttendee({
+					address: createEncryptedMailAddress({
+						address: property.value.substring("mailto:".length),
+						name: property.params["CN"],
+					}),
+					status,
+				}))
+			}
+		})
+		event.attendees = attendees
+		const organizerProp = eventObj.properties.find(p => p.name === "ORGANIZER")
+		if (organizerProp && organizerProp.value.startsWith("mailto:")) {
+			event.organizer = createEncryptedMailAddress({
+				address: organizerProp.value.substring("mailto:".length),
+				name: organizerProp.params["name"],
+			})
+		}
+
 		event.uid = getPropStringValue(eventObj, "UID")
 		return {event, alarms}
 	})
+	return {method, contents}
 }
 
 type Duration = {

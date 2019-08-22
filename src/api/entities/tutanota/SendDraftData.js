@@ -3,6 +3,7 @@
 import {create, TypeRef} from "../../common/EntityFunctions"
 
 import type {AttachmentKeyData} from "./AttachmentKeyData"
+import type {CalendarFileMethod} from "./CalendarFileMethod"
 import type {InternalRecipientKeyData} from "./InternalRecipientKeyData"
 import type {SecureExternalRecipientKeyData} from "./SecureExternalRecipientKeyData"
 
@@ -81,6 +82,15 @@ export const _TypeModel: TypeModel = {
 			"refType": "AttachmentKeyData",
 			"final": true
 		},
+		"calendarMethods": {
+			"name": "calendarMethods",
+			"id": 1118,
+			"since": 42,
+			"type": "AGGREGATION",
+			"cardinality": "Any",
+			"refType": "CalendarFileMethod",
+			"final": true
+		},
 		"internalRecipientKeyData": {
 			"name": "internalRecipientKeyData",
 			"id": 553,
@@ -111,7 +121,7 @@ export const _TypeModel: TypeModel = {
 		}
 	},
 	"app": "tutanota",
-	"version": "41"
+	"version": "42"
 }
 
 export function createSendDraftData(values?: $Shape<$Exact<SendDraftData>>): SendDraftData {
@@ -129,6 +139,7 @@ export type SendDraftData = {
 	senderNameUnencrypted: ?string;
 
 	attachmentKeyData: AttachmentKeyData[];
+	calendarMethods: CalendarFileMethod[];
 	internalRecipientKeyData: InternalRecipientKeyData[];
 	secureExternalRecipientKeyData: SecureExternalRecipientKeyData[];
 	mail: IdTuple;
