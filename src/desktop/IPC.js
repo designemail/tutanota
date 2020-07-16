@@ -27,6 +27,7 @@ import type {DesktopDownloadManager} from "./DesktopDownloadManager"
 import {DesktopAlarmScheduler} from "./sse/DesktopAlarmScheduler"
 import type {SseInfo} from "./sse/DesktopSseClient"
 import {base64ToUint8Array} from "../api/common/utils/Encoding"
+import {ElectronUpdater} from "./ElectronUpdater"
 
 /**
  * node-side endpoint for communication between the renderer thread and the node thread
@@ -44,6 +45,7 @@ export class IPC {
 	_requestId: number = 0;
 	_queue: {[string]: Function};
 	_alarmScheduler: DesktopAlarmScheduler;
+	_updater: ElectronUpdater;
 
 	constructor(
 		conf: DesktopConfigHandler,
@@ -54,7 +56,8 @@ export class IPC {
 		alarmStorage: DesktopAlarmStorage,
 		desktopCryptoFacade: DesktopCryptoFacade,
 		dl: DesktopDownloadManager,
-		alarmScheduler: DesktopAlarmScheduler
+		alarmScheduler: DesktopAlarmScheduler,
+		updater: ElectronUpdater
 	) {
 		this._conf = conf
 		this._sse = sse
@@ -65,6 +68,7 @@ export class IPC {
 		this._crypto = desktopCryptoFacade
 		this._dl = dl
 		this._alarmScheduler = alarmScheduler
+		this._updater = updater
 
 		this._initialized = []
 		this._queue = {}
@@ -120,6 +124,7 @@ export class IPC {
 						config.isMailtoHandler = isMailtoHandler
 						config.runOnStartup = autoLaunchEnabled
 						config.isIntegrated = isIntegrated
+						config.updateAvailable = this._updater.updateIsReady
 						return config
 					})
 			case 'openFileChooser':
@@ -212,6 +217,8 @@ export class IPC {
 				return Promise.resolve()
 			case 'changeLanguage':
 				return lang.setLanguage(args[0])
+			case 'manualUpdate':
+				return this._updater.manualUpdate()
 			default:
 				return Promise.reject(new Error(`Invalid Method invocation: ${method}`))
 		}

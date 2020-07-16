@@ -12,6 +12,19 @@ import {DesktopTray} from "./tray/DesktopTray"
 import fs from 'fs-extra'
 import path from 'path'
 
+type VersionInfo = {
+	version: string,
+	files: Array<any>,
+	path: string,
+	sha512: string,
+	releaseDate: string,
+}
+
+type UpdateCheckResult = {
+	versionInfo: VersionInfo,
+	updateInfo: VersionInfo,
+}
+
 export class ElectronUpdater {
 	_conf: DesktopConfigHandler;
 	_notifier: DesktopNotifier;
@@ -21,6 +34,10 @@ export class ElectronUpdater {
 	_fallbackPollInterval: number = 15 * 60 * 1000;
 	_installOnQuit = false;
 	_logger: {info(string, ...args: any): void, warn(string, ...args: any): void, error(string, ...args: any): void}
+
+	get updateIsReady() {
+		return this._installOnQuit
+	}
 
 	constructor(conf: DesktopConfigHandler, notifier: DesktopNotifier, fallbackPollInterval: ?number) {
 		this._conf = conf
@@ -35,29 +52,32 @@ export class ElectronUpdater {
 			warn: (m: string, ...args: any) => console.warn.apply(console, ["autoUpdater warn:\n", m].concat(args)),
 			error: (m: string, ...args: any) => console.error.apply(console, ["autoUpdater error:\n", m].concat(args)),
 		}
-		autoUpdater.logger = null
+		autoUpdater.logger = this._logger
 		// default behaviour is to just dl the update as soon as found, but we want to check the signature
 		// before doing telling the updater to get the file.
 		autoUpdater.autoDownload = false
 		autoUpdater.autoInstallOnAppQuit = false
-		autoUpdater.on('update-available', updateInfo => {
+		autoUpdater.on('checking-for-update', () => {
+			this._logger.info("checking-for-update")
+		}).on('update-available', updateInfo => {
 			this._logger.info("update-available")
 			this._stopPolling()
 			Promise
 				.any(this._conf.get("pubKeys").map(pk => this._verifySignature(pk, downcast(updateInfo))))
 				.then(() => this._downloadUpdate())
+				.then(p => console.log("update dl'd to ", p))
 				.catch(UpdateError, e => {
 					this._logger.warn("invalid signature, could not update", e)
 				})
 		}).on('update-not-available', info => {
 			this._logger.info("update not available:", info)
+		}).on("download-progress", prg => {
+			console.log('update dl progress:', prg)
 		}).on('update-downloaded', info => {
 			this._logger.info("update-downloaded")
 			this._stopPolling()
 			this._installOnQuit = true
 			this._notifyAndInstall(downcast(info))
-		}).on('checking-for-update', () => {
-			this._logger.info("checking-for-update")
 		}).on('error', e => {
 			this._stopPolling()
 			this._errorCount += 1
@@ -129,7 +149,7 @@ export class ElectronUpdater {
 		this._startPolling()
 		// the first check is immediate, all others are done with a delay
 		// and random exponential backoff
-		this._checkUpdate()
+		this.checkUpdate()
 	}
 
 	_verifySignature(pubKey: string, updateInfo: UpdateInfo): Promise<void> {
@@ -158,7 +178,7 @@ export class ElectronUpdater {
 			// between (base value) and (base value) * 2^(errorCount)
 			const multiplier = Math.floor(Math.random() * Math.pow(2, this._errorCount)) + 1
 			const interval = (this._conf.get("pollingInterval") || this._fallbackPollInterval)
-			this._updatePollInterval = setInterval(() => this._checkUpdate(), interval * multiplier)
+			this._updatePollInterval = setInterval(() => this.checkUpdate(), interval * multiplier)
 		}
 	}
 
@@ -167,16 +187,41 @@ export class ElectronUpdater {
 		this._updatePollInterval = null
 	}
 
-	_checkUpdate(): void {
-		autoUpdater
-			.checkForUpdates()
-			.catch((e: Error) => {
-				this._logger.error("Update check failed,", e.message)
-			})
+	checkUpdate(): Promise<boolean> {
+		return new Promise(resolve => {
+			let cleanup = hasUpdate => {
+				cleanup = () => {}
+				resolve(hasUpdate)
+				autoUpdater.removeListener('update-not-available', updateNotAvailable)
+				autoUpdater.removeListener('update-downloaded', updateDownloaded)
+				autoUpdater.removeListener('error', updateNotAvailable)
+			}
+			const updateNotAvailable = () => cleanup(false)
+			const updateDownloaded = () => cleanup(true)
+			autoUpdater
+				.checkForUpdates() // Promise<UpdateCheckResult>
+				.catch((e: Error) => {
+					this._logger.error("Update check failed,", e.message)
+					cleanup(false)
+				})
+
+			autoUpdater.once('update-not-available', updateNotAvailable)
+			           .once('update-downloaded', updateDownloaded)
+			           .once('error', updateNotAvailable)
+		})
 	}
 
-	_downloadUpdate(): void {
-		autoUpdater
+	manualUpdate(): Promise<boolean> {
+		if (!this.updateIsReady) {
+			return this.checkUpdate()
+		}
+		this.installUpdate()
+		return Promise.resolve(false)
+	}
+
+	_downloadUpdate(): Promise<void> {
+		console.log("downloading")
+		return autoUpdater
 			.downloadUpdate()
 			.catch(e => {
 				this._logger.error("Update Download failed,", e.message)
@@ -184,6 +229,7 @@ export class ElectronUpdater {
 	}
 
 	_notifyAndInstall(info: UpdateInfo): void {
+		console.log("notifying for update")
 		this._notifier
 		    .showOneShot({
 			    title: lang.get('updateAvailable_label', {"{version}": info.version}),
@@ -192,15 +238,20 @@ export class ElectronUpdater {
 		    })
 		    .then((res) => {
 			    if (res === NotificationResult.Click) {
-				    //the window manager enables force-quit on the app-quit event,
-				    // which is not emitted for quitAndInstall
-				    // so we enable force-quit manually with a custom event
-				    app.emit('enable-force-quit')
-				    this._installOnQuit = false
-				    autoUpdater.quitAndInstall(false, true)
+				    this.installUpdate()
 			    }
 		    })
 		    .catch((e: Error) => this._logger.error("Notification failed,", e.message))
+	}
+
+	installUpdate() {
+		console.log("installing")
+		//the window manager enables force-quit on the app-quit event,
+		// which is not emitted for quitAndInstall
+		// so we enable force-quit manually with a custom event
+		app.emit('enable-force-quit')
+		this._installOnQuit = false
+		autoUpdater.quitAndInstall(false, true)
 	}
 
 	_notifyUpdateError() {

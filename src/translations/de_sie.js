@@ -1123,6 +1123,9 @@ module.exports = {
 		"yourFolders_action": "Ihre ORDNER",
 		"yourMessage_label": "Ihre Nachricht",
 		"couldNotAuthU2f_msg": "Es konnte nicht mit dem Sicherheitsschlüssel authentifiziert werden.",
-		"waitingForU2f_msg": "Warten auf den Sicherheitsschlüssel…"
+		"waitingForU2f_msg": "Warten auf den Sicherheitsschlüssel…",
+		"noUpdateAvailable_msg": "Keine neue Version verfügbar.",
+		"installNow_action": "Jetzt installieren.",
+		"checkingForUpdate_action": "Suche nach Aktualisierung…"
 	}
 }

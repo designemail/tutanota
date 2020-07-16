@@ -1128,6 +1128,9 @@ module.exports = {
 		"describeProblem_msg": "Bitte gib deine Frage ein",
 		"noSolution_msg": "Du hast keine Lösung zu deinem Problem gefunden?",
 		"contactSupport_action": "Support kontaktieren",
+		"noUpdateAvailable_msg": "Keine neue Version verfügbar.",
+		"installNow_action": "Jetzt installieren.",
+		"checkingForUpdate_action": "Suche nach Aktualisierung…",
 		"creditCardDeclined_msg": "Leider wurde deine Kreditkarte abgelehnt. Bitte kontaktiere deine Bank um dies zu beheben oder wähle eine andere Zahlungsmethode.",
 	}
 }

@@ -1119,13 +1119,15 @@ module.exports = {
 		"yourMessage_label": "Your message",
 		"couldNotAuthU2f_msg": "Could not authenticate with security key.",
 		"waitingForU2f_msg": "Waiting for security key…",
-		"invoiceNotPaid_msg": "Sorry, you are currently not allowed to send emails because at least one of your invoices is not paid. Please update your payment data in 'Settings' -> 'Payment data' and trigger the payment there afterwards.",
 		"businessUseUpgradeNeeded_msg": "Sorry, you are currently not allowed to send or receive emails (except to the Tutanota sales support at sales@tutao.de) because you have a business account which is only allowed with paid subscriptions. Please upgrade to a paid subscription now.",
 		"upgradeNeeded_msg": "Sorry, you are currently not allowed to send or receive emails (except to the Tutanota sales support at sales@tutao.de) because you first need to order a paid subscription.",
 		"howCanWeHelp_title": "How can we help you?",
 		"describeProblem_msg": "Please enter your question",
 		"noSolution_msg": "Have not found a solution to your problem?",
 		"contactSupport_action": "Contact support",
+		"noUpdateAvailable_msg": "No update found.",
+		"installNow_action": "Install now.",
+		"checkingForUpdate_action": "Checking for Update…",
 		"creditCardDeclined_msg": "Unfortunately, your credit card was declined. Please get in contact with your bank to solve this or select a different payment method.",
 	}
 }

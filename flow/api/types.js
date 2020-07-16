@@ -198,6 +198,7 @@ type NativeRequestType = 'init'
 	| 'closeApp'
 	| 'unload' // desktop
 	| 'changeLanguage'
+	| 'manualUpdate'
 
 
 type JsRequestType = 'createMailEditor'

@@ -8,7 +8,6 @@ const pj = require('../package.json')
 
 module.exports = function (opts) {
 	const {nameSuffix, version, updateUrl, iconPath, sign, notarize, unpacked} = opts
-
 	return {
 		"name": "tutanota-desktop" + nameSuffix,
 		"main": "./src/desktop/DesktopMain.js",
