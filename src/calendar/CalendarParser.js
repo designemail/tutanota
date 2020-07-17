@@ -442,7 +442,7 @@ export function parseCalendarEvents(icalObject: ICalObject, zone: string): Parse
 		eventObj.properties.forEach((property) => {
 			if (property.name === "ATTENDEE") {
 				if (!property.value.startsWith("mailto:")) return
-				const status = parstatToCalendarAttendeeStatus[property.params["PARSTAT"]]
+				const status = parstatToCalendarAttendeeStatus[property.params["PARTSTAT"]]
 				if (!status) return
 
 				attendees.push(createCalendarEventAttendee({

@@ -222,7 +222,6 @@ o.spec("CalendarImporterTest", function () {
 				"END:VEVENT"
 			])
 		})
-
 	})
 
 	o.spec("import", function () {

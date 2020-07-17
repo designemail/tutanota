@@ -446,7 +446,7 @@ export function getEmailSignature(): string {
 }
 
 
-export function getMailboxName(mailboxDetails: MailboxDetail): string {
+export function getMailboxName(logins: LoginController, mailboxDetails: MailboxDetail): string {
 	if (!logins.isInternalUserLoggedIn()) {
 		return lang.get("mailbox_label")
 	} else if (isUserMailbox(mailboxDetails)) {

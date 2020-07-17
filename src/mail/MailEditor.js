@@ -460,7 +460,7 @@ export class MailEditor {
 
 	getPasswordStrength(recipientInfo: RecipientInfo) {
 		let reserved = getEnabledMailAddressesWithUser(this._mailboxDetails, logins.getUserController().userGroupInfo).concat(
-			getMailboxName(this._mailboxDetails),
+			getMailboxName(logins, this._mailboxDetails),
 			recipientInfo.mailAddress,
 			recipientInfo.name
 		)

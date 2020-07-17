@@ -55,8 +55,8 @@ export function eventEndsAfterDay(currentDate: Date, zone: string, event: Calend
 	return getEventEnd(event, zone).getTime() > getStartOfNextDayWithZone(currentDate, zone).getTime()
 }
 
-export function generateUid(event: CalendarEvent, timestamp: number): string {
-	return `${neverNull(event._ownerGroup)}${timestamp}@tutanota.com`
+export function generateUid(groupId: Id, timestamp: number): string {
+	return `${groupId}${timestamp}@tutanota.com`
 }
 
 /**

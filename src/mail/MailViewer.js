@@ -178,7 +178,7 @@ export class MailViewer {
 			if (folder) {
 				locator.mailModel.getMailboxDetailsForMail(mail).then((mailboxDetails) => {
 					this._folderText =
-						`${lang.get("location_label")}: ${getMailboxName(mailboxDetails)} / ${getFolderName(folder)}`.toUpperCase()
+						`${lang.get("location_label")}: ${getMailboxName(logins, mailboxDetails)} / ${getFolderName(folder)}`.toUpperCase()
 					m.redraw()
 				})
 			}

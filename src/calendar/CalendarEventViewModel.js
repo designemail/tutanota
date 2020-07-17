@@ -54,7 +54,7 @@ import type {RecipientInfo, RecipientInfoTypeEnum} from "../api/common/Recipient
 import {RecipientInfoType} from "../api/common/RecipientInfo"
 import type {Contact} from "../api/entities/tutanota/Contact"
 import {SendMailModel} from "../mail/SendMailModel"
-import {firstThrow} from "../api/common/utils/ArrayUtils"
+import {firstThrow, flat} from "../api/common/utils/ArrayUtils"
 import {addMapEntry} from "../api/common/utils/MapUtils"
 import type {RepeatRule} from "../api/entities/sys/RepeatRule"
 import {UserError} from "../api/common/error/UserError"
@@ -64,7 +64,8 @@ import {locator} from "../api/main/MainLocator"
 
 const TIMESTAMP_ZERO_YEAR = 1970
 
-export type EventCreateResult = {|askForUpdates: ?((bool) => Promise<void>)|}
+// whether to close dialog
+export type EventCreateResult = boolean
 
 const EventType = Object.freeze({
 	OWN: "own",
@@ -139,6 +140,7 @@ export class CalendarEventViewModel {
 		calendars: Map<Id, CalendarInfo>,
 		existingEvent?: ?CalendarEvent,
 		responseTo: ?Mail,
+		resolveRecipientsLazily: boolean,
 	) {
 		this._distributor = distributor
 		this._calendarModel = calendarModel
@@ -196,7 +198,7 @@ export class CalendarEventViewModel {
 					this._updateModel.addRecipient("bcc", {
 						name: attendee.address.name,
 						address: attendee.address.address,
-					})
+					}, resolveRecipientsLazily)
 				}
 				newStatuses.set(attendee.address.address, getAttendeeStatus(attendee))
 			})
@@ -555,8 +557,7 @@ export class CalendarEventViewModel {
 		cancelAddresses.forEach((a) => {
 			this._cancelModel.addRecipient("bcc", {name: a.name, address: a.address, contact: null})
 		})
-		this._distributor.sendCancellation(updatedEvent, this._cancelModel)
-		return Promise.resolve()
+		return this._distributor.sendCancellation(updatedEvent, this._cancelModel)
 	}
 
 	_checkPasswords(): void {
@@ -570,11 +571,10 @@ export class CalendarEventViewModel {
 	/**
 	 * @reject UserError
 	 */
-	onOkPressed(): Promise<EventCreateResult> {
+	saveAndSend(
+		{askForUpdates, askInsecurePassword}: {askForUpdates: () => Promise<boolean>, askInsecurePassword: () => Promise<boolean>}
+	): Promise<EventCreateResult> {
 		return Promise.resolve().then(() => {
-			// We check it here because updated are send asynchronously and dialog wil be already closed
-			this._checkPasswords()
-
 			// We have to use existing instance to get all the final fields correctly
 			// Using clone feels hacky but otherwise we need to save all attributes of the existing event somewhere and if dialog is
 			// cancelled we also don't want to modify passed event
@@ -612,7 +612,9 @@ export class CalendarEventViewModel {
 			newEvent.location = this.location()
 			newEvent.endTime = endDate
 			newEvent.invitedConfidentially = this.isConfidential()
-			newEvent.uid = this.existingEvent && this.existingEvent.uid ? this.existingEvent.uid : generateUid(newEvent, Date.now())
+			newEvent.uid = this.existingEvent && this.existingEvent.uid
+				? this.existingEvent.uid
+				: generateUid(this.selectedCalendar().group._id, Date.now())
 			const repeat = this.repeat
 			if (repeat == null) {
 				newEvent.repeatRule = null
@@ -674,38 +676,39 @@ export class CalendarEventViewModel {
 				}
 			}
 
+			const passwordCheck = () => this.hasInsecurePasswords().then((hasInsecure) => hasInsecure ? askInsecurePassword() : true)
 			if (this._viewingOwnEvent()) {
 				if (existingAttendees.length || this._cancelModel._bccRecipients.length) {
 					// ask for update
-					return {
-						askForUpdates: (sendOutUpdate) => {
-							return Promise.resolve()
-							              .then(() => this._sendInvite(newEvent))
-							              .then(() => this._cancelModel._bccRecipients.length
-								              ? this._distributor.sendCancellation(newEvent, this._cancelModel)
-								              : Promise.resolve())
-							              .then(() => doCreateEvent())
-							              .then(() => {
-								              // We do not wait for update to finish, it's done in background
-								              if (sendOutUpdate && existingAttendees.length) {
-									              this._distributor.sendUpdate(newEvent, this._updateModel)
-								              }
-							              })
-						}
-					}
+					return askForUpdates().then((sendOutUpdate) => {
+						return Promise.resolve(sendOutUpdate ? passwordCheck() : true)
+						              .then((send) => {
+							              if (!send) return false
+							              return this._sendInvite(newEvent)
+							                         .then(() => this._cancelModel._bccRecipients.length
+								                         ? this._distributor.sendCancellation(newEvent, this._cancelModel)
+								                         : Promise.resolve())
+							                         .then(() => doCreateEvent())
+							                         .then(() => {
+								                         if (sendOutUpdate && existingAttendees.length) {
+									                         return this._distributor.sendUpdate(newEvent, this._updateModel)
+								                         }
+							                         })
+							                         .then(() => true)
+						              })
+					})
 				} else {
-					// just create the event
+					// just create the event if there are no existing recipients
+					return passwordCheck().then((send) => {
+						if (!send) return false
+						return this._sendInvite(newEvent)
+						           .then(() => doCreateEvent())
+						           .then(() => true)
 
-					return this._sendInvite(newEvent)
-					           .then(() => doCreateEvent())
-					           .then(() => {
-						           return {askForUpdates: null}
-					           })
+					})
 				}
 			} else {
-				return doCreateEvent().then(() => {
-					return {askForUpdates: null}
-				})
+				return passwordCheck().then((send) => send && doCreateEvent().then(() => true))
 			}
 		})
 	}
@@ -795,8 +798,38 @@ export class CalendarEventViewModel {
 		}
 	}
 
-	createRecipientInfo(name: ?string, address: string, contact: ?Contact): RecipientInfo {
-		return this._inviteModel.createRecipientInfo(name, address, contact)
+	shouldShowPasswordFields(): boolean {
+		return this.isConfidential() && this._eventType === EventType.OWN
+	}
+
+	getPasswordStrength(guest: Guest): number {
+		const recipient = this._allRecipients().find((r) => r.mailAddress === guest.address.address)
+		return recipient && recipient.contact ? this._inviteModel.getPasswordStrength(assertNotNull(recipient)) : 0
+	}
+
+	hasInsecurePasswords(): Promise<boolean> {
+		return Promise.resolve().then(() => {
+			if (!this.isConfidential()) {
+				return Promise.resolve(false)
+			}
+			if (this._eventType === EventType.INVITE) { // We can't receive invites from external users
+				return Promise.resolve(false)
+			}
+			return Promise.all([
+				this._inviteModel._waitForResolvedRecipients(),
+				this._updateModel._waitForResolvedRecipients(),
+				this._cancelModel._waitForResolvedRecipients()
+			]).then((recipientGroups) => {
+				const allRecipients = flat(recipientGroups)
+				return this.isConfidential() && allRecipients
+					.filter(recipient => recipient.contact && recipient.contact.presharedPassword)
+					.some(recipient => this._inviteModel.getPasswordStrength(recipient) < 80)
+			})
+		})
+	}
+
+	_allRecipients(): Array<RecipientInfo> {
+		return this._inviteModel._allRecipients().concat(this._updateModel._allRecipients()).concat(this._cancelModel._allRecipients())
 	}
 
 	dispose() {
@@ -821,7 +854,9 @@ function createCalendarAlarm(identifier: string, trigger: string): AlarmInfo {
 }
 
 
-export function createCalendarEventViewModel(date: Date, calendars: Map<Id, CalendarInfo>, mailboxDetail: MailboxDetail, existingEvent: ?CalendarEvent, previousMail: ?Mail): CalendarEventViewModel {
+export function createCalendarEventViewModel(date: Date, calendars: Map<Id, CalendarInfo>, mailboxDetail: MailboxDetail,
+                                             existingEvent: ?CalendarEvent, previousMail: ?Mail, resolveRecipientsLazily: boolean,
+): CalendarEventViewModel {
 	return new CalendarEventViewModel(
 		logins.getUserController(),
 		calendarUpdateDistributor,
@@ -833,5 +868,6 @@ export function createCalendarEventViewModel(date: Date, calendars: Map<Id, Cale
 		calendars,
 		existingEvent,
 		previousMail,
+		resolveRecipientsLazily,
 	)
 }

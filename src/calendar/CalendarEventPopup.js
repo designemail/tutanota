@@ -36,7 +36,8 @@ export class CalendarEventPopup implements ModalComponent {
 		if (calendarInfo == null) {
 			throw new Error("Passed event from unknown calendar")
 		}
-		this._viewModel = createCalendarEventViewModel(getEventStart(calendarEvent, getTimeZone()), calendars, mailboxDetail, calendarEvent)
+		this._viewModel = createCalendarEventViewModel(getEventStart(calendarEvent, getTimeZone()), calendars, mailboxDetail,
+			calendarEvent, null, true)
 	}
 
 	show() {

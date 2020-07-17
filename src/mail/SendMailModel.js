@@ -1,5 +1,4 @@
 // @flow
-import {Dialog} from "../gui/base/Dialog"
 import type {CalendarMethodEnum, ConversationTypeEnum} from "../api/common/TutanotaConstants"
 import {ConversationType, MAX_ATTACHMENT_SIZE, OperationType, ReplyType} from "../api/common/TutanotaConstants"
 import {load, setup, update} from "../api/main/Entity"
@@ -179,7 +178,7 @@ export class SendMailModel {
 	getPasswordStrength(recipientInfo: RecipientInfo) {
 		const contact = assertNotNull(recipientInfo.contact)
 		let reserved = getEnabledMailAddressesWithUser(this._mailboxDetails, this._logins.getUserController().userGroupInfo).concat(
-			getMailboxName(this._mailboxDetails),
+			getMailboxName(this._logins, this._mailboxDetails),
 			recipientInfo.mailAddress,
 			recipientInfo.name
 		)
@@ -285,7 +284,7 @@ export class SendMailModel {
 		this._attachments = []
 
 		this.attachFiles(attachments)
-		const makeRecipientInfo = (r: Recipient) => this.createRecipientInfo(r.name, r.address, r.contact)
+		const makeRecipientInfo = (r: Recipient) => this._createRecipientInfo(r.name, r.address, r.contact, false)
 
 		const {to = [], cc = [], bcc = []} = recipients
 		this._toRecipients = to.filter(r => isMailAddress(r.address, false))
@@ -306,18 +305,20 @@ export class SendMailModel {
 		return Promise.resolve()
 	}
 
-	createRecipientInfo(name: ?string, address: string, contact: ?Contact): RecipientInfo {
+	_createRecipientInfo(name: ?string, address: string, contact: ?Contact, resolveLazily: boolean): RecipientInfo {
 		const ri = createRecipientInfo(address, name, contact)
-		if (this._logins.isInternalUserLoggedIn()) {
-			resolveRecipientInfoContact(ri, this._contactModel, this._logins.getUserController().user)
-				.then(() => this.recipientsChanged(undefined))
+		if (!resolveLazily) {
+			if (this._logins.isInternalUserLoggedIn()) {
+				resolveRecipientInfoContact(ri, this._contactModel, this._logins.getUserController().user)
+					.then(() => this.recipientsChanged(undefined))
+			}
+			resolveRecipientInfo(this._mailModel, ri).then(() => this.recipientsChanged(undefined))
 		}
-		resolveRecipientInfo(this._mailModel, ri).then(() => this.recipientsChanged(undefined))
 		return ri
 	}
 
-	addRecipient(type: RecipientField, recipient: Recipient): RecipientInfo {
-		const recipientInfo = this.createRecipientInfo(recipient.name, recipient.address, recipient.contact)
+	addRecipient(type: RecipientField, recipient: Recipient, resolveLazily: boolean = false): RecipientInfo {
+		const recipientInfo = this._createRecipientInfo(recipient.name, recipient.address, recipient.contact, resolveLazily)
 		this._recipientList(type).push(recipientInfo)
 		this._mailChanged = true
 		this.recipientsChanged(undefined)
@@ -405,7 +406,10 @@ export class SendMailModel {
 		return worker
 			.updateMailDraft(this._subject(), body, this._senderAddress, this._getSenderName(), this._toRecipients,
 				this._ccRecipients, this._bccRecipients, attachments, this.isConfidential(), draft)
-			.catch(LockedError, () => Dialog.error("operationStillActive_msg"))
+			.catch(LockedError, (e) => {
+				console.log("updateDraft: operation is still active", e)
+				throw new UserError("operationStillActive_msg")
+			})
 			.catch(NotFoundError, () => {
 				console.log("draft has been deleted, creating new one")
 				return this._createDraft(body, attachments)
@@ -472,11 +476,6 @@ export class SendMailModel {
 							}
 
 							let sendMailConfirm = Promise.resolve(true)
-							if (this._confidentialButtonState
-								&& externalRecipients.reduce((min, current) =>
-									Math.min(min, this.getPasswordStrength(current)), 100) < 80) {
-								sendMailConfirm = Dialog.confirm("presharedPasswordNotStrongEnough_msg")
-							}
 
 							return sendMailConfirm.then(ok => {
 								if (ok) {

@@ -15,7 +15,7 @@ import {CalendarEventTypeRef} from "../api/entities/tutanota/CalendarEvent"
 import {createFile} from "../api/entities/tutanota/File"
 import {createDataFile} from "../api/common/DataFile"
 import {pad} from "../api/common/utils/StringUtils"
-import {downcast, neverNull, ProgressMonitor} from "../api/common/utils/Utils"
+import {assertNotNull, downcast, neverNull, ProgressMonitor} from "../api/common/utils/Utils"
 import {elementIdPart, isSameId, listIdPart} from "../api/common/EntityFunctions"
 import type {UserAlarmInfo} from "../api/entities/sys/UserAlarmInfo"
 import {UserAlarmInfoTypeRef} from "../api/entities/sys/UserAlarmInfo"
@@ -285,7 +285,7 @@ export function serializeEvent(event: CalendarEvent, alarms: Array<UserAlarmInfo
 		dateStart,
 		dateEnd,
 		`DTSTAMP:${formatDateTimeUTC(now)}`,
-		`UID:${event.uid ? event.uid : generateUid(event, now.getTime())}`, // legacy: only generate uid for older calendar events.
+		`UID:${event.uid ? event.uid : generateUid(assertNotNull(event._ownerGroup), now.getTime())}`, // legacy: only generate uid for older calendar events.
 		`SEQUENCE:${event.sequence}`,
 		`SUMMARY:${escapeSemicolons(event.summary)}`,
 	]
@@ -310,7 +310,7 @@ function serializeParticipants(event: CalendarEvent): Array<string> {
 	}
 	const attendeesProperties = attendees.map(({address, status}) => {
 		const namePart = address.name ? `;CN=${address.name}` : ""
-		return `ATTENDEE;CUTYPE=INDIVIDUAL;ROLE=REQ-PARTICIPANT;PARSTAT=${calendarAttendeeStatusToParstat[status]}`
+		return `ATTENDEE;CUTYPE=INDIVIDUAL;ROLE=REQ-PARTICIPANT;PARTSTAT=${calendarAttendeeStatusToParstat[status]}`
 			+ `;RSVP=TRUE${namePart}:mailto:${address.address}`
 	})
 	return lines.concat(attendeesProperties)

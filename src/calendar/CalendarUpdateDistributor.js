@@ -11,8 +11,6 @@ import {theme} from "../gui/theme"
 import {assertNotNull, noOp} from "../api/common/utils/Utils"
 import type {EncryptedMailAddress} from "../api/entities/tutanota/EncryptedMailAddress"
 import {SendMailModel} from "../mail/SendMailModel"
-import {show} from "../gui/base/NotificationOverlay"
-import m from "mithril"
 import type {Mail} from "../api/entities/tutanota/Mail"
 import {windowFacade} from "../misc/WindowFacade"
 
@@ -55,9 +53,6 @@ export class CalendarMailDistributor implements CalendarUpdateDistributor {
 			body: makeInviteEmailBody(event, ""),
 			event,
 			sender: assertOrganizer(event).address
-		}).then(() => {
-			const closeSent = show({view: () => m("", lang.get("updateSent_msg"))}, {}, [])
-			setTimeout(closeSent, 3000)
 		})
 	}
 

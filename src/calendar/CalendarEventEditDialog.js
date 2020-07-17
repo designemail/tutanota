@@ -19,7 +19,7 @@ import {AlarmInterval, CalendarAttendeeStatus, EndType, Keys, RepeatPeriod} from
 import {findAndRemove, numberRange, remove} from "../api/common/utils/ArrayUtils"
 import {getCalendarName, getStartOfTheWeekOffsetForUser} from "./CalendarUtils"
 import {TimePicker} from "../gui/base/TimePicker"
-import {getDisplayText} from "../mail/MailUtils"
+import {createRecipientInfo, getDisplayText} from "../mail/MailUtils"
 import type {MailboxDetail} from "../mail/MailModel"
 import {Bubble, BubbleTextField} from "../gui/base/BubbleTextField"
 import {MailAddressBubbleHandler} from "../misc/MailAddressBubbleHandler"
@@ -36,7 +36,6 @@ import {CalendarEventViewModel, createCalendarEventViewModel} from "./CalendarEv
 import type {RecipientInfo} from "../api/common/RecipientInfo"
 import {RecipientInfoType} from "../api/common/RecipientInfo"
 import {PasswordIndicator} from "../gui/base/PasswordIndicator"
-import {getPasswordStrength} from "../misc/PasswordUtils"
 import {animations, height} from "../gui/animation/Animations"
 import {UserError} from "../api/common/error/UserError"
 import type {Mail} from "../api/entities/tutanota/Mail"
@@ -64,7 +63,7 @@ const alarmIntervalItems = [
 
 export function showCalendarEventDialog(date: Date, calendars: Map<Id, CalendarInfo>, mailboxDetail: MailboxDetail,
                                         existingEvent: ?CalendarEvent, responseMail: ?Mail) {
-	const viewModel = createCalendarEventViewModel(date, calendars, mailboxDetail, existingEvent, responseMail)
+	const viewModel = createCalendarEventViewModel(date, calendars, mailboxDetail, existingEvent, responseMail, false)
 	const startOfTheWeekOffset = getStartOfTheWeekOffsetForUser()
 	const startDatePicker = new DatePicker(startOfTheWeekOffset, "dateFrom_label", "emptyString_msg", true, viewModel.readOnly)
 	const endDatePicker = new DatePicker(startOfTheWeekOffset, "dateTo_label", "emptyString_msg", true, viewModel.readOnly)
@@ -123,46 +122,49 @@ export function showCalendarEventDialog(date: Date, calendars: Map<Id, CalendarI
 		} else {
 			viewModel.changeDescription(description)
 		}
-		viewModel.onOkPressed()
-		         .then(({askForUpdates}) => {
-			         if (askForUpdates) {
-				         let alertDialog: Dialog
-				         const cancelButton = {
-					         label: "cancel_action",
-					         click: () => alertDialog.close(),
-					         type: ButtonType.Secondary
-				         }
-				         const noButton = {
-					         label: "no_label",
-					         click: () => {
-						         askForUpdates(false).then(finish).catch(UserError, (e) => Dialog.error(() => e.message))
-						         alertDialog.close()
-					         },
-					         type: ButtonType.Secondary
-				         }
-				         const yesButton = {
-					         label: "yes_label",
-					         click: () => {
-						         askForUpdates(true).then(finish).catch(UserError, (e) => Dialog.error(() => e.message))
-						         alertDialog.close()
-					         },
-					         type: ButtonType.Primary,
-				         }
-				         const onclose = (positive) => positive
-					         ? askForUpdates(true).then(finish).catch(UserError, (e) => Dialog.error(() => e.message))
-					         : finish()
-				         alertDialog = Dialog.alert("sendUpdates_msg", [cancelButton, noButton, yesButton], onclose)
-			         } else {
-				         finish()
-			         }
-		         })
-		         .catch(UserError, (e) => Dialog.error(() => e.message))
+
+		function askForUpdates() {
+			return new Promise((resolve) => {
+				let alertDialog: Dialog
+				const cancelButton = {
+					label: "cancel_action",
+					click: () => alertDialog.close(),
+					type: ButtonType.Secondary
+				}
+				const noButton = {
+					label: "no_label",
+					click: () => {
+						resolve(false)
+						alertDialog.close()
+					},
+					type: ButtonType.Secondary
+				}
+				const yesButton = {
+					label: "yes_label",
+					click: () => {
+						resolve(true)
+						alertDialog.close()
+					},
+					type: ButtonType.Primary,
+				}
+
+				const onclose = (positive) => positive
+					? resolve(true)
+					: finish()
+				alertDialog = Dialog.alert("sendUpdates_msg", [cancelButton, noButton, yesButton], onclose)
+			})
+		}
+
+		Promise.resolve().then(() => {
+			return viewModel.saveAndSend({askForUpdates, askInsecurePassword: () => Dialog.confirm("presharedPasswordNotStrongEnough_msg")})
+			                .then((shouldClose) => shouldClose && finish())
+			                .catch(UserError, (e) => Dialog.error(() => e.message))
+
+		})
+
 	}
 
-	const attendeesField = makeBubbleHandler(viewModel, (bubble) => {
-		viewModel.addAttendee(bubble.entity.mailAddress, bubble.entity.contact)
-		remove(attendeesField.bubbles, bubble)
-	})
+	const attendeesField = makeBubbleTextField(viewModel)
 
 	const attendeesExpanded = stream(viewModel.attendees().length > 0)
 
@@ -179,14 +181,14 @@ export function showCalendarEventDialog(date: Date, calendars: Map<Id, CalendarI
 			guests.splice(indexOfOwn, 1)
 			guests.unshift(ownAttendee)
 		}
-		const externalGuests = viewModel.isConfidential()
+		const externalGuests = viewModel.shouldShowPasswordFields()
 			? guests.filter((a) => a.type === RecipientInfoType.EXTERNAL)
 			        .map((guest) => {
 				        return m(TextFieldN, {
 					        value: stream(guest.password || ""),
 					        type: TextFieldType.ExternalPassword,
 					        label: () => lang.get("passwordFor_label", {"{1}": guest.address.address}),
-					        helpLabel: () => m(new PasswordIndicator(() => getPasswordStrength(guest.password || "", []))),
+					        helpLabel: () => m(new PasswordIndicator(() => viewModel.getPasswordStrength(guest))),
 					        oncreate: ({dom}) => animations.add(dom, height(0, dom.offsetHeight)),
 					        onbeforeremove: ({dom}) => animations.add(dom, height(dom.offsetHeight, 0)),
 					        key: guest.address.address,
@@ -314,7 +316,7 @@ export function showCalendarEventDialog(date: Date, calendars: Map<Id, CalendarI
 
 	function renderChangesMessage() {
 		return viewModel.existingEvent && viewModel.existingEvent.isCopy
-			? m(".mt", lang.get("eventCopy_msg"))
+			? m(".mt.mb-s", lang.get("eventCopy_msg"))
 			: null
 	}
 
@@ -445,7 +447,7 @@ export function showCalendarEventDialog(date: Date, calendars: Map<Id, CalendarI
 function renderStatusIcon(viewModel: CalendarEventViewModel, attendee: Guest): Children {
 	const icon = iconForAttendeeStatus[attendee.status]
 
-	return m(Icon, {icon, class: "mr-s"})
+	return m(Icon, {icon, class: "mr-s", style: {fill: theme.content_fg}})
 }
 
 
@@ -473,12 +475,11 @@ function createEndTypeValues() {
 	]
 }
 
-function makeBubbleHandler(viewModel: CalendarEventViewModel, onBubbleCreated: (Bubble<RecipientInfo>) => void): BubbleTextField<RecipientInfo> {
+function makeBubbleTextField(viewModel: CalendarEventViewModel): BubbleTextField<RecipientInfo> {
 	function createBubbleContextButtons(name: string, mailAddress: string): Array<ButtonAttrs | string> {
 		let buttonAttrs = [mailAddress]
 		buttonAttrs.push({
 			label: "remove_action",
-			type: ButtonType.Secondary,
 			click: () => {
 				findAndRemove(invitePeopleValueTextField.bubbles, (bubble) => bubble.entity.mailAddress === mailAddress)
 			},
@@ -488,14 +489,18 @@ function makeBubbleHandler(viewModel: CalendarEventViewModel, onBubbleCreated: (
 
 	const bubbleHandler = new MailAddressBubbleHandler({
 		createBubble(name: ?string, mailAddress: string, contact: ?Contact): Bubble<RecipientInfo> {
-			const recipientInfo = viewModel.createRecipientInfo(name, mailAddress, contact)
+			const recipientInfo = createRecipientInfo(mailAddress, name, contact)
 			const buttonAttrs = attachDropdown({
 				label: () => getDisplayText(recipientInfo.name, mailAddress, false),
 				type: ButtonType.TextBubble,
 				isSelected: () => false,
 			}, () => createBubbleContextButtons(recipientInfo.name, mailAddress))
 			const bubble = new Bubble(recipientInfo, buttonAttrs, mailAddress)
-			Promise.resolve().then(() => onBubbleCreated(bubble))
+			// remove bubble after it was created - we don't need it for calendar invites because the attendees are shown in a seperate list.
+			Promise.resolve().then(() => {
+				viewModel.addAttendee(bubble.entity.mailAddress, bubble.entity.contact)
+				remove(invitePeopleValueTextField.bubbles, bubble)
+			})
 			return bubble
 		},
 

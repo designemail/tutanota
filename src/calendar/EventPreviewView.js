@@ -39,8 +39,8 @@ export class EventPreviewView implements MComponent<Attrs> {
 					? m(".flex.pb-s.items-center", [
 						renderSectionIndicator(BootIcons.Contacts),
 						m(".flex-wrap", event.attendees.map(a => m(".flex.items-center", [
-							m(".span.mr-s.line-break-anywhere", a.address.address),
-							m(Icon, {icon: iconForAttendeeStatus[a.status]})
+							m(Icon, {icon: iconForAttendeeStatus[a.status], style: {fill: theme.content_fg}, class: "mr-s"}),
+							m(".span.line-break-anywhere", a.address.address),
 						]))),
 					])
 					: null,

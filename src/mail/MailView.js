@@ -460,7 +460,7 @@ export class MailView implements CurrentView {
 
 	createMailBoxExpanderButton(mailboxDetails: MailboxDetail): ExpanderButton {
 		const mailGroupId = mailboxDetails.mailGroup._id
-		const mailboxExpander = new ExpanderButton(() => getMailboxName(mailboxDetails), new ExpanderPanel({
+		const mailboxExpander = new ExpanderButton(() => getMailboxName(logins, mailboxDetails), new ExpanderPanel({
 			view: () => {
 				const groupCounters = locator.mailModel.mailboxCounters()[mailGroupId] || {}
 				return m(".folders",
