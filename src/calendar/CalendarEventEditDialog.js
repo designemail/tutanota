@@ -40,6 +40,7 @@ import {animations, height} from "../gui/animation/Animations"
 import {UserError} from "../api/common/error/UserError"
 import type {Mail} from "../api/entities/tutanota/Mail"
 import {theme} from "../gui/theme"
+import {showProgressDialog} from "../gui/base/ProgressDialog"
 
 export const iconForAttendeeStatus = Object.freeze({
 	[CalendarAttendeeStatus.ACCEPTED]: Icons.CircleCheckmark,
@@ -156,10 +157,11 @@ export function showCalendarEventDialog(date: Date, calendars: Map<Id, CalendarI
 		}
 
 		Promise.resolve().then(() => {
-			return viewModel.saveAndSend({askForUpdates, askInsecurePassword: () => Dialog.confirm("presharedPasswordNotStrongEnough_msg")})
-			                .then((shouldClose) => shouldClose && finish())
-			                .catch(UserError, (e) => Dialog.error(() => e.message))
 
+			return showProgressDialog("pleaseWait_msg",
+				viewModel.saveAndSend({askForUpdates, askInsecurePassword: () => Dialog.confirm("presharedPasswordNotStrongEnough_msg")})
+				         .then((shouldClose) => shouldClose && finish()))
+				.catch(UserError, (e) => Dialog.error(() => e.message))
 		})
 
 	}
@@ -378,18 +380,6 @@ export function showCalendarEventDialog(date: Date, calendars: Map<Id, CalendarI
 	function finish() {
 		viewModel.dispose()
 		dialog.close()
-	}
-
-	function deleteEvent() {
-		if (viewModel.existingEvent == null) {
-			return Promise.resolve(true)
-		}
-		return Dialog.confirm("deleteEventConfirmation_msg").then((answer) => {
-			if (answer) {
-				viewModel.deleteEvent()
-				finish()
-			}
-		})
 	}
 
 	function renderHeading() {
