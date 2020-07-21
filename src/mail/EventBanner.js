@@ -6,8 +6,8 @@ import {px, size} from "../gui/size"
 import {EventPreviewView} from "../calendar/EventPreviewView"
 import {ButtonN, ButtonType} from "../gui/base/ButtonN"
 import {replyToEventInvitation, showEventDetails} from "../calendar/CalendarInvites"
-import type {CalendarAttendeeStatusEnum} from "../api/common/TutanotaConstants"
-import {CalendarAttendeeStatus} from "../api/common/TutanotaConstants"
+import type {CalendarAttendeeStatusEnum, CalendarMethodEnum} from "../api/common/TutanotaConstants"
+import {CalendarAttendeeStatus, CalendarMethod} from "../api/common/TutanotaConstants"
 import {lang} from "../misc/LanguageViewModel"
 import {BannerButton} from "../gui/base/Banner"
 import {theme} from "../gui/theme"
@@ -18,10 +18,11 @@ export type Attrs = {
 	event: CalendarEvent,
 	mail: Mail,
 	recipient: string,
+	method: CalendarMethodEnum
 }
 
 export class EventBanner implements MComponent<Attrs> {
-	view({attrs: {event, mail, recipient}}: Vnode<Attrs>): Children {
+	view({attrs: {event, mail, recipient, method}}: Vnode<Attrs>): Children {
 		const ownAttendee = event.attendees.find((a) => a.address.address === recipient)
 
 		return m(MessageBoxN, {
@@ -37,7 +38,7 @@ export class EventBanner implements MComponent<Attrs> {
 				}
 			}, [
 				m(EventPreviewView, {event, ownAttendee}),
-				m("", ownAttendee
+				m("", ownAttendee && method === CalendarMethod.REQUEST
 					? ownAttendee.status !== CalendarAttendeeStatus.NEEDS_ACTION
 						? m(".align-self-start", lang.get("eventYourDecision_msg", {"{decision}": decisionString(ownAttendee.status)}))
 						: renderReplyButtons(mail, event, ownAttendee)

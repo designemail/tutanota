@@ -4,17 +4,21 @@ import {worker} from "../api/main/WorkerClient"
 import {showCalendarEventDialog} from "./CalendarEventEditDialog"
 import type {CalendarEvent} from "../api/entities/tutanota/CalendarEvent"
 import type {File as TutanotaFile} from "../api/entities/tutanota/File"
-import {loadCalendarInfos} from "./CalendarModel"
+import {calendarModel, loadCalendarInfos} from "./CalendarModel"
 import {locator} from "../api/main/MainLocator"
 import type {CalendarEventAttendee} from "../api/entities/tutanota/CalendarEventAttendee"
-import type {CalendarAttendeeStatusEnum} from "../api/common/TutanotaConstants"
+import type {CalendarAttendeeStatusEnum, CalendarMethodEnum} from "../api/common/TutanotaConstants"
+import {CalendarMethod, getAsEnumValue} from "../api/common/TutanotaConstants"
 import {assertNotNull, clone} from "../api/common/utils/Utils"
-import {incrementSequence} from "./CalendarUtils"
+import {getTimeZone, incrementSequence} from "./CalendarUtils"
 import type {CalendarInfo} from "./CalendarView"
 import {logins} from "../api/main/LoginController"
 import {SendMailModel} from "../mail/SendMailModel"
 import type {Mail} from "../api/entities/tutanota/Mail"
 import {calendarUpdateDistributor} from "./CalendarUpdateDistributor"
+import {Dialog} from "../gui/base/Dialog"
+import {UserError} from "../api/common/error/UserError"
+import {firstThrow} from "../api/common/utils/ArrayUtils"
 
 function loadOrCreateCalendarInfo(): Promise<Map<Id, CalendarInfo>> {
 	return loadCalendarInfos()
@@ -23,12 +27,13 @@ function loadOrCreateCalendarInfo(): Promise<Map<Id, CalendarInfo>> {
 			: worker.addCalendar("").then(() => loadCalendarInfos()))
 }
 
-function getParsedEvent(fileData: DataFile): ?{event: CalendarEvent, uid: string} {
+function getParsedEvent(fileData: DataFile): ?{method: CalendarMethodEnum, event: CalendarEvent, uid: string} {
 	try {
-		const {contents} = parseCalendarFile(fileData)
+		const {contents, method} = parseCalendarFile(fileData)
+		const verifiedMethod = getAsEnumValue(CalendarMethod, method) || CalendarMethod.PUBLISH
 		const parsedEventWithAlarms = contents[0]
 		if (parsedEventWithAlarms && parsedEventWithAlarms.event.uid) {
-			return {event: parsedEventWithAlarms.event, uid: parsedEventWithAlarms.event.uid}
+			return {event: parsedEventWithAlarms.event, uid: parsedEventWithAlarms.event.uid, method: verifiedMethod}
 		} else {
 			return null
 		}
@@ -52,21 +57,21 @@ export function showEventDetails(event: CalendarEvent, mail: ?Mail) {
 	})
 }
 
-export function eventDetailsForFile(file: TutanotaFile): Promise<?CalendarEvent> {
+export function eventDetailsForFile(file: TutanotaFile): Promise<?{event: CalendarEvent, method: CalendarMethodEnum}> {
 	return worker.downloadFileContent(file).then((fileData) => {
 		const parsedEventWithAlarms = getParsedEvent(fileData)
 		if (parsedEventWithAlarms == null) {
 			return null
 		}
-		const parsedEvent = parsedEventWithAlarms.event
+		const {event: parsedEvent, method} = parsedEventWithAlarms
 		return worker.getEventByUid(parsedEventWithAlarms.uid).then((existingEvent) => {
 			if (existingEvent) {
 				// It should be the latest version eventually via CalendarEventUpdates
-				return existingEvent
+				return {event: existingEvent, method}
 			} else {
 				// Set isCopy here to show that this is not created by us
 				parsedEvent.isCopy = true
-				return parsedEvent
+				return {event: parsedEvent, method}
 			}
 		})
 	})
@@ -82,8 +87,15 @@ export function replyToEventInvitation(
 	const foundAttendee = assertNotNull(eventClone.attendees.find((a) => a.address.address === attendee.address.address))
 	foundAttendee.status = decision
 	eventClone.sequence = incrementSequence(eventClone.sequence)
-	return locator.mailModel.getMailboxDetailsForMail(previousMail).then(mailboxDetails => {
+
+	return Promise.all([
+		loadOrCreateCalendarInfo(),
+		locator.mailModel.getMailboxDetailsForMail(previousMail)
+	]).then(([calendars, mailboxDetails]) => {
+		const calendar = firstThrow(Array.from(calendars.values()))
 		const sendMailModel = new SendMailModel(logins, locator.mailModel, locator.contactModel, locator.eventController, mailboxDetails)
 		return calendarUpdateDistributor.sendResponse(eventClone, sendMailModel, foundAttendee.address.address, previousMail, decision)
+		                                .catch(UserError, (e) => Dialog.error(() => e.message))
+		                                .then(() => calendarModel.createEvent(eventClone, [], getTimeZone(), calendar.groupRoot))
 	})
 }

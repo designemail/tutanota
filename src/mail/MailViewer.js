@@ -14,7 +14,7 @@ import {animations, scroll} from "../gui/animation/Animations"
 import {nativeApp} from "../native/NativeWrapper"
 import type {MailBody} from "../api/entities/tutanota/MailBody"
 import {MailBodyTypeRef} from "../api/entities/tutanota/MailBody"
-import type {InboxRuleTypeEnum, MailReportTypeEnum} from "../api/common/TutanotaConstants"
+import type {CalendarMethodEnum, InboxRuleTypeEnum, MailReportTypeEnum} from "../api/common/TutanotaConstants"
 import {
 	ConversationType,
 	FeatureType,
@@ -163,7 +163,7 @@ export class MailViewer {
 	_lastTouchStart: {x: number, y: number, time: number};
 	_domForScrolling: ?HTMLElement
 	_warningDismissed: boolean;
-	_event: ?{event: CalendarEvent, recipient: string};
+	_event: ?{|event: CalendarEvent, method: CalendarMethodEnum, recipient: string|};
 
 	constructor(mail: Mail, showFolder: boolean) {
 		if (isDesktop()) {
@@ -305,9 +305,7 @@ export class MailViewer {
 										buttons: [{text: lang.get("close_alt"), click: () => this._warningDismissed = true}]
 									})
 									: null,
-							this._event
-								? m(EventBanner, {event: this._event.event, recipient: this._event.recipient, mail: this.mail})
-								: null,
+							this._renderEventBanner(),
 							this._renderAttachments(),
 							m("hr.hr.mb.mt-s"),
 						]),
@@ -374,6 +372,17 @@ export class MailViewer {
 
 		this.onremove = () => windowFacade.removeResizeListener(resizeListener)
 		this._setupShortcuts()
+	}
+
+	_renderEventBanner(): Children {
+		return this._event
+			? m(EventBanner, {
+				event: this._event.event,
+				method: this._event.method,
+				recipient: this._event.recipient,
+				mail: this.mail
+			})
+			: null
 	}
 
 	_createDetailsExpander(bubbleMenuWidth: number, mail: Mail, expanderStyle: {}) {
@@ -857,8 +866,8 @@ export class MailViewer {
 					              Promise.all([
 						              eventDetailsForFile(calendarFile),
 						              this._getSenderOfResponseMail(),
-					              ]).then(([event, recipient]) => {
-						              this._event = event && {event, recipient}
+					              ]).then(([parsedEvent, recipient]) => {
+						              this._event = parsedEvent && {event: parsedEvent.event, method: parsedEvent.method, recipient}
 						              m.redraw()
 					              })
 				              }

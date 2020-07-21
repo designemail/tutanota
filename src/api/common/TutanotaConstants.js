@@ -674,3 +674,13 @@ export const CalendarMethod = Object.freeze({
 })
 
 export type CalendarMethodEnum = $Values<typeof CalendarMethod>
+
+export function getAsEnumValue<K, V>(enumValues: {[K]: V}, value: string): ?V {
+	for (const key of Object.getOwnPropertyNames(enumValues)) {
+		const enumValue = enumValues[key]
+		if (enumValue === value) {
+			return enumValue
+		}
+	}
+	return null
+}

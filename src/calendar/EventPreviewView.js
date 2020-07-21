@@ -24,7 +24,7 @@ export class EventPreviewView implements MComponent<Attrs> {
 	_sanitizedDescription: (string) => string = memoized((html) => htmlSanitizer.sanitize(html, true).text)
 
 	view({attrs: {event}}: Vnode<Attrs>) {
-		return m(".flex.col.pb-s", [
+		return m(".flex.col", [
 			m(".flex.col", {
 				style: {fontSize: px(size.font_size_smaller)}
 			}, [
