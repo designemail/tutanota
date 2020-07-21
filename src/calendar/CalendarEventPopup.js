@@ -16,6 +16,7 @@ import {styles} from "../gui/styles"
 import type {CalendarInfo} from "./CalendarView"
 import {CalendarEventViewModel, createCalendarEventViewModel} from "./CalendarEventViewModel"
 import type {MailboxDetail} from "../mail/MailModel"
+import {UserError} from "../api/common/error/UserError"
 
 export class CalendarEventPopup implements ModalComponent {
 	_calendarEvent: CalendarEvent;
@@ -173,7 +174,7 @@ function showMobileDialog(viewModel: CalendarEventViewModel, event: CalendarEven
 function deleteEvent(viewModel: CalendarEventViewModel): Promise<boolean> {
 	return Dialog.confirm("deleteEventConfirmation_msg").then((confirmed) => {
 		if (confirmed) {
-			viewModel.deleteEvent()
+			viewModel.deleteEvent().catch(UserError, (e) => Dialog.error(() => e.message))
 		}
 		return confirmed
 	})
