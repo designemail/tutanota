@@ -16,7 +16,7 @@ assertMainOrNode()
 export type SelectorItem<T> = {name: string, value: T, selectable?: boolean, icon?: AllIconsEnum}
 export type SelectorItemList<T> = $ReadOnlyArray<SelectorItem<T>>
 
-export type DropDownSelectorAttrs<T> = {
+export type DropDownSelectorAttrs<T> = {|
 	label: TranslationKey | lazy<string>,
 	items: SelectorItemList<T>,
 	selectedValue: Stream<?T>,
@@ -29,7 +29,8 @@ export type DropDownSelectorAttrs<T> = {
 	dropdownWidth?: number,
 	icon?: AllIconsEnum,
 	disabled?: boolean,
-}
+	class?: string,
+|}
 
 export class DropDownSelectorN<T> implements MComponent<DropDownSelectorAttrs<T>> {
 
@@ -41,7 +42,7 @@ export class DropDownSelectorN<T> implements MComponent<DropDownSelectorAttrs<T>
 			helpLabel: a.helpLabel,
 			disabled: true,
 			onclick: a.disabled ? noOp : this.createDropdown(a),
-			class: "click pt",
+			class: "click " + (a.class == null ? "pt" : a.class),
 			injectionsRight: () => a.disabled
 				? null
 				: m(ButtonN, {

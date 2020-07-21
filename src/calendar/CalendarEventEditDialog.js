@@ -561,6 +561,12 @@ function renderGuest(guest: Guest, index: number, viewModel: CalendarEventViewMo
 	const {organizer} = viewModel
 	const isOrganizer = organizer && guest.address.address === organizer.address
 	const editableOrganizer = isOrganizer && viewModel.canModifyOrganizer()
+	const attendingItems = [
+		{name: lang.get("yes_label"), value: CalendarAttendeeStatus.ACCEPTED},
+		{name: lang.get("maybe_label"), value: CalendarAttendeeStatus.TENTATIVE},
+		{name: lang.get("no_label"), value: CalendarAttendeeStatus.DECLINED},
+		{name: lang.get("awaiting_label"), value: CalendarAttendeeStatus.NEEDS_ACTION, selectable: false}
+	]
 	return m(".flex", {
 		style: {
 			height: px(size.button_height),
@@ -590,11 +596,12 @@ function renderGuest(guest: Guest, index: number, viewModel: CalendarEventViewMo
 		m(".flex-grow"),
 		[
 			ownAttendee === guest && viewModel.canModifyOwnAttendance()
-				? m(".mr-negative-s", m(ButtonN, {
-					label: "edit_action",
-					type: ButtonType.Action,
-					icon: () => Icons.Edit,
-					click: (e) => showOwnAttendanceButton(viewModel, e)
+				? m("", {style: {minWidth: "120px"}}, m(DropDownSelectorN, {
+					label: "attending_label",
+					items: attendingItems,
+					selectedValue: stream(guest.status),
+					class: "",
+					selectionChangedHandler: (value) => value != null && viewModel.selectGoing(value),
 				}))
 				: viewModel.canModifyGuests()
 				? m(".mr-negative-s", m(ButtonN, {

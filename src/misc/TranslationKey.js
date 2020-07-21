@@ -1128,7 +1128,7 @@ export type TranslationKeyType =
 	| "awaiting_label"
 	| "guest_label"
 	| "guests_label"
-	| "attendingEvent_label"
+	| "invitedToEvent_msg"
 	| "eventCopy_msg"
 	| "deleteEventConfirmation_msg"
 	| "addGuest_label"
@@ -1136,3 +1136,4 @@ export type TranslationKeyType =
 	| "you_label"
 	| "sendUpdates_msg"
 	| "updateSent_msg"
+	| "attending_label"
