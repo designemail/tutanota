@@ -10,7 +10,7 @@ import {formatDateTime, formatDateWithWeekday, formatStorageSize, formatTime, ur
 import {windowFacade} from "../misc/WindowFacade"
 import {ease} from "../gui/animation/Easing"
 import type {DomMutation} from "../gui/animation/Animations"
-import {animations, scroll} from "../gui/animation/Animations"
+import {animations, height, opacity, scroll} from "../gui/animation/Animations"
 import {nativeApp} from "../native/NativeWrapper"
 import type {MailBody} from "../api/entities/tutanota/MailBody"
 import {MailBodyTypeRef} from "../api/entities/tutanota/MailBody"
@@ -380,7 +380,12 @@ export class MailViewer {
 				event: this._event.event,
 				method: this._event.method,
 				recipient: this._event.recipient,
-				mail: this.mail
+				mail: this.mail,
+				oncreate: (vnode) => {
+					animations.add(vnode.dom, [height(0, vnode.dom.offsetHeight), opacity(0, 1, true)], {delay: 200})
+					vnode.dom.style.height = 0
+					vnode.dom.style.opacity = 0
+				}
 			})
 			: null
 	}

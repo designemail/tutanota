@@ -392,17 +392,6 @@ export function showCalendarEventDialog(date: Date, calendars: Map<Id, CalendarI
 		})
 	}
 
-	const renderDeleteButton = () => (existingEvent && existingEvent._id && !viewModel.readOnly)
-		? m(".mr-negative-s", m(ButtonN, {
-				label: "delete_action",
-				type: ButtonType.Action,
-				icon: () => Icons.Trash,
-				click: () => deleteEvent()
-			}
-		))
-		: null
-
-
 	function renderHeading() {
 		return m(TextFieldN, {
 			label: "title_placeholder",

@@ -16,7 +16,7 @@ assertMainOrNode()
 export type SelectorItem<T> = {name: string, value: T, selectable?: boolean, icon?: AllIconsEnum}
 export type SelectorItemList<T> = $ReadOnlyArray<SelectorItem<T>>
 
-export type DropDownSelectorAttrs<T> = {|
+export type DropDownSelectorAttrs<T> = {
 	label: TranslationKey | lazy<string>,
 	items: SelectorItemList<T>,
 	selectedValue: Stream<?T>,
@@ -30,7 +30,7 @@ export type DropDownSelectorAttrs<T> = {|
 	icon?: AllIconsEnum,
 	disabled?: boolean,
 	class?: string,
-|}
+}
 
 export class DropDownSelectorN<T> implements MComponent<DropDownSelectorAttrs<T>> {
 

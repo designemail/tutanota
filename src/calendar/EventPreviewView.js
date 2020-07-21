@@ -11,7 +11,6 @@ import {Icons} from "../gui/base/icons/Icons"
 import {isSameDayOfDate} from "../api/common/utils/DateUtils"
 import {incrementByRepeatPeriod} from "./CalendarModel"
 import {getTimeZone} from "./CalendarUtils"
-import {px, size} from "../gui/size"
 import {memoized} from "../api/common/utils/Utils"
 import {htmlSanitizer} from "../misc/HtmlSanitizer"
 import {iconForAttendeeStatus} from "./CalendarEventEditDialog"
@@ -25,9 +24,7 @@ export class EventPreviewView implements MComponent<Attrs> {
 
 	view({attrs: {event}}: Vnode<Attrs>) {
 		return m(".flex.col", [
-			m(".flex.col", {
-				style: {fontSize: px(size.font_size_smaller)}
-			}, [
+			m(".flex.col.smaller", [
 				m(".flex.pb-s.items-center", [renderSectionIndicator(BootIcons.Calendar), m(".h3", event.summary)]),
 				m(".flex.pb-s.items-center", [
 						renderSectionIndicator(Icons.Time),

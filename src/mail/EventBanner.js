@@ -34,13 +34,16 @@ export class EventBanner implements MComponent<Attrs> {
 					display: "flex",
 					flexDirection: "column",
 					paddingLeft: px(size.hpad_large),
-					paddingRight: px(size.hpad_large)
+					paddingRight: px(size.hpad_large),
+					overflow: "hidden",
+					paddingTop: "0",
 				}
 			}, [
+				m(".mt"), // Separate element instead of padding on a parent so that the banner can collapse in height
 				m(EventPreviewView, {event, ownAttendee}),
 				m("", ownAttendee && method === CalendarMethod.REQUEST
 					? ownAttendee.status !== CalendarAttendeeStatus.NEEDS_ACTION
-						? m(".align-self-start", lang.get("eventYourDecision_msg", {"{decision}": decisionString(ownAttendee.status)}))
+						? m(".align-self-start.start.smaller", lang.get("eventYourDecision_msg", {"{decision}": decisionString(ownAttendee.status)}))
 						: renderReplyButtons(mail, event, ownAttendee)
 					: null),
 				m(".ml-negative-s.limit-width.align-self-start", m(ButtonN, {

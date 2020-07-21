@@ -134,6 +134,9 @@ styles.registerStyle('main', () => {
 		'small, .small': {
 			'font-size': px(size.font_size_small),
 		},
+		'.smaller': {
+			'font-size': px(size.font_size_smaller),
+		},
 
 		'.b': {
 			'font-weight': 'bold',
@@ -362,6 +365,7 @@ styles.registerStyle('main', () => {
 		'.text-center': {'text-align': 'center'},
 		'.right': {'text-align': 'right'},
 		'.left': {'text-align': 'left'},
+		'.start': {'text-align': 'start'},
 		'.statusTextColor': {color: theme.content_accent},
 		'.button-height': {height: px(size.button_height)},
 		'.button-min-height': {'min-height': px(size.button_height)},
