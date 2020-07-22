@@ -16,7 +16,7 @@ import {TextField, Type} from "../gui/base/TextField"
 import m from "mithril"
 import {lang} from "./LanguageViewModel"
 import {assertMainOrNode, getHttpOrigin, isIOSApp, Mode} from "../api/Env"
-import {AccountType, ApprovalStatus, ConversationType} from "../api/common/TutanotaConstants"
+import {AccountType, ApprovalStatus, ConversationType, MailMethod} from "../api/common/TutanotaConstants"
 import {errorToString, neverNull} from "../api/common/utils/Utils"
 import {createRecipientInfo} from "../mail/MailUtils"
 import {logins} from "../api/main/LoginController"
@@ -311,7 +311,8 @@ export function sendFeedbackMail(content: FeedbackContent): Promise<void> {
 		null,
 		[],
 		true,
-		[]
+		[],
+		MailMethod.NONE,
 	).then(draft => {
 		return worker.sendMailDraft(draft, [recipient], "de")
 	})

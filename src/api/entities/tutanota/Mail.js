@@ -115,6 +115,15 @@ export const _TypeModel: TypeModel = {
 			"final": true,
 			"encrypted": true
 		},
+		"method": {
+			"name": "method",
+			"id": 1121,
+			"since": 42,
+			"type": "Number",
+			"cardinality": "One",
+			"final": true,
+			"encrypted": true
+		},
 		"movedTime": {
 			"name": "movedTime",
 			"id": 896,
@@ -316,6 +325,7 @@ export type Mail = {
 	confidential: boolean;
 	differentEnvelopeSender: ?string;
 	listUnsubscribe: boolean;
+	method: NumberString;
 	movedTime: ?Date;
 	phishingStatus: NumberString;
 	receivedDate: Date;

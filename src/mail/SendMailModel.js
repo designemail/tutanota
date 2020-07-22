@@ -1,5 +1,5 @@
 // @flow
-import type {CalendarMethodEnum, ConversationTypeEnum} from "../api/common/TutanotaConstants"
+import type {ConversationTypeEnum, MailMethodEnum} from "../api/common/TutanotaConstants"
 import {ConversationType, MAX_ATTACHMENT_SIZE, OperationType, ReplyType} from "../api/common/TutanotaConstants"
 import {load, setup, update} from "../api/main/Entity"
 import {worker} from "../api/main/WorkerClient"
@@ -382,11 +382,11 @@ export class SendMailModel {
 	 * @throws FileNotFoundError when one of the attachments could not be opened
 	 * @throws PreconditionFailedError when the draft is locked
 	 */
-	saveDraft(body: string, saveAttachments: boolean): Promise<void> {
+	saveDraft(body: string, saveAttachments: boolean, mailMethod: MailMethodEnum): Promise<void> {
 		const attachments = (saveAttachments) ? this._attachments : null
 		const {draft} = this
 		return Promise.resolve(draft == null
-			? this._createDraft(body, attachments)
+			? this._createDraft(body, attachments, mailMethod)
 			: this._updateDraft(body, attachments, draft)
 		).then((draft) => {
 			this.draft = draft
@@ -412,14 +412,14 @@ export class SendMailModel {
 			})
 			.catch(NotFoundError, () => {
 				console.log("draft has been deleted, creating new one")
-				return this._createDraft(body, attachments)
+				return this._createDraft(body, attachments, downcast(draft.method))
 			})
 	}
 
-	_createDraft(body: string, attachments: ?$ReadOnlyArray<EditorAttachment>): Promise<Mail> {
+	_createDraft(body: string, attachments: ?$ReadOnlyArray<EditorAttachment>, mailMethod: MailMethodEnum): Promise<Mail> {
 		return worker.createMailDraft(this._subject(), body,
 			this._senderAddress, this._getSenderName(), this._toRecipients, this._ccRecipients, this._bccRecipients, this._conversationType,
-			this._previousMessageId, attachments, this.isConfidential(), this._replyTos)
+			this._previousMessageId, attachments, this.isConfidential(), this._replyTos, mailMethod)
 	}
 
 	isConfidential(): boolean {
@@ -445,7 +445,7 @@ export class SendMailModel {
 	 * @reject {LockedError}
 	 * @reject {UserError}
 	 */
-	send(body: string, calendarMethod?: CalendarMethodEnum): Promise<*> {
+	send(body: string, mailMethod: MailMethodEnum): Promise<*> {
 		return Promise
 			.resolve()
 			.then(() => {
@@ -460,7 +460,7 @@ export class SendMailModel {
 						if (recipients.length === 1 && recipients[0].mailAddress.toLowerCase().trim() === "approval@tutao.de") {
 							return [recipients, true]
 						} else {
-							return this.saveDraft(body, /*saveAttachments*/true)
+							return this.saveDraft(body, /*saveAttachments*/true, mailMethod)
 							           .return([recipients, false])
 						}
 					})
@@ -479,20 +479,11 @@ export class SendMailModel {
 
 							return sendMailConfirm.then(ok => {
 								if (ok) {
-									const calendarFileMethods = calendarMethod
-										? this._attachments
-										      .filter((file) => {
-											      const tutanotaFile: TutanotaFile = downcast(file)
-											      return tutanotaFile.mimeType && tutanotaFile.mimeType.startsWith("text/calendar")
-										      })
-										      .map((file) => [downcast(file)._id, calendarMethod])
-										: []
 									return this._updateContacts(resolvedRecipients)
 									           .then(() => worker.sendMailDraft(
 										           neverNull(this.draft),
 										           resolvedRecipients,
 										           this._selectedNotificationLanguage,
-										           calendarFileMethods
 									           ))
 									           .then(() => this._updatePreviousMail())
 									           .then(() => this._updateExternalLanguage())

@@ -43,6 +43,15 @@ export const _TypeModel: TypeModel = {
 			"final": true,
 			"encrypted": true
 		},
+		"method": {
+			"name": "method",
+			"id": 1117,
+			"since": 42,
+			"type": "Number",
+			"cardinality": "One",
+			"final": true,
+			"encrypted": true
+		},
 		"senderMailAddress": {
 			"name": "senderMailAddress",
 			"id": 500,
@@ -142,6 +151,7 @@ export type DraftData = {
 	_id: Id;
 	bodyText: string;
 	confidential: boolean;
+	method: NumberString;
 	senderMailAddress: string;
 	senderName: string;
 	subject: string;

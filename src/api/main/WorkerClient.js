@@ -13,6 +13,7 @@ import type {
 	CloseEventBusOptionEnum,
 	ConversationTypeEnum,
 	EntropySrcEnum,
+	MailMethodEnum,
 	ShareCapabilityEnum,
 	SpamRuleFieldTypeEnum,
 	SpamRuleTypeEnum
@@ -221,7 +222,7 @@ export class WorkerClient implements EntityRestInterface {
 	                ccRecipients: $ReadOnlyArray<RecipientInfo>, bccRecipients: $ReadOnlyArray<RecipientInfo>,
 	                conversationType: ConversationTypeEnum, previousMessageId: ?Id,
 	                attachments: ?$ReadOnlyArray<TutanotaFile | DataFile | FileReference>,
-	                confidential: boolean, replyTos: $ReadOnlyArray<RecipientInfo>
+	                confidential: boolean, replyTos: $ReadOnlyArray<RecipientInfo>, method: MailMethodEnum
 	): Promise<Mail> {
 		return this._postRequest(new Request('createMailDraft', arguments))
 	}
@@ -232,8 +233,8 @@ export class WorkerClient implements EntityRestInterface {
 		return this._postRequest(new Request('updateMailDraft', arguments))
 	}
 
-	sendMailDraft(draft: Mail, recipientInfos: $ReadOnlyArray<RecipientInfo>, language: string, calendarMethods: Array<[IdTuple, CalendarMethodEnum]> = []): Promise<void> {
-		return this._postRequest(new Request('sendMailDraft', [draft, recipientInfos, language, calendarMethods]))
+	sendMailDraft(draft: Mail, recipientInfos: $ReadOnlyArray<RecipientInfo>, language: string): Promise<void> {
+		return this._postRequest(new Request('sendMailDraft', [draft, recipientInfos, language]))
 	}
 
 	downloadFileContent(file: TutanotaFile): Promise<DataFile> {

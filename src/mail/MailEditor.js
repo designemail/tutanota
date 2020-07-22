@@ -13,6 +13,7 @@ import {
 	ConversationType,
 	FeatureType,
 	Keys,
+	MailMethod,
 	MAX_ATTACHMENT_SIZE,
 	OperationType,
 	ReplyType
@@ -793,7 +794,7 @@ export class MailEditor {
 		let promise = null
 		const createMailDraft = () => worker.createMailDraft(this.subject.value(), body,
 			this._senderField.selectedValue(), senderName, to, cc, bcc, this.conversationType, this.previousMessageId,
-			attachments, this._isConfidential(), this._replyTos)
+			attachments, this._isConfidential(), this._replyTos, MailMethod.NONE)
 		const draft = this.draft
 		if (draft != null) {
 			promise = worker.updateMailDraft(this.subject.value(), body, this._senderField.selectedValue(),

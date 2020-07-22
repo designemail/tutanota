@@ -1,8 +1,8 @@
 //@flow
 import {lang} from "../misc/LanguageViewModel"
 import {makeInvitationCalendarFile} from "./CalendarImporter"
-import type {CalendarAttendeeStatusEnum, CalendarMethodEnum} from "../api/common/TutanotaConstants"
-import {CalendarMethod, ConversationType, getAttendeeStatus} from "../api/common/TutanotaConstants"
+import type {CalendarAttendeeStatusEnum, MailMethodEnum} from "../api/common/TutanotaConstants"
+import {CalendarMethod, ConversationType, getAttendeeStatus, MailMethod, mailMethodToCalendarMethod} from "../api/common/TutanotaConstants"
 import {calendarAttendeeStatusSymbol, formatEventDuration, getTimeZone} from "./CalendarUtils"
 import type {CalendarEvent} from "../api/entities/tutanota/CalendarEvent"
 import type {MailAddress} from "../api/entities/tutanota/MailAddress"
@@ -37,7 +37,7 @@ export class CalendarMailDistributor implements CalendarUpdateDistributor {
 		const message = lang.get("eventInviteMail_msg", {"{event}": event.summary})
 		return this._sendCalendarFile({
 			sendMailModel,
-			method: CalendarMethod.REQUEST,
+			method: MailMethod.ICAL_REQUEST,
 			subject: message,
 			body: makeInviteEmailBody(event, message),
 			event,
@@ -48,7 +48,7 @@ export class CalendarMailDistributor implements CalendarUpdateDistributor {
 	sendUpdate(event: CalendarEvent, sendMailModel: SendMailModel): Promise<void> {
 		return this._sendCalendarFile({
 			sendMailModel,
-			method: CalendarMethod.REQUEST,
+			method: MailMethod.ICAL_REQUEST,
 			subject: lang.get("eventUpdated_msg", {"{event}": event.summary}),
 			body: makeInviteEmailBody(event, ""),
 			event,
@@ -60,7 +60,7 @@ export class CalendarMailDistributor implements CalendarUpdateDistributor {
 		const message = lang.get("eventCancelled_msg", {"{event}": event.summary})
 		return this._sendCalendarFile({
 			sendMailModel,
-			method: CalendarMethod.CANCEL,
+			method: MailMethod.ICAL_CANCEL,
 			subject: message,
 			body: makeInviteEmailBody(event, message),
 			event,
@@ -92,23 +92,23 @@ export class CalendarMailDistributor implements CalendarUpdateDistributor {
 			              })
 			              .then(() => {
 				              sendMailModel.attachFiles([makeInvitationCalendarFile(event, CalendarMethod.REPLY, new Date(), getTimeZone())])
-				              return sendMailModel.send(body, CalendarMethod.REPLY)
+				              return sendMailModel.send(body, MailMethod.ICAL_REPLY)
 			              })
 			              .finally(() => this._sendEnd())
 		} else {
-			return this._sendCalendarFile({sendMailModel, method: CalendarMethod.REPLY, subject: message, body, event, sender: sendAs})
+			return this._sendCalendarFile({sendMailModel, method: MailMethod.ICAL_REPLY, subject: message, body, event, sender: sendAs})
 		}
 	}
 
 	_sendCalendarFile({sendMailModel, method, subject, event, body, sender}: {
 		sendMailModel: SendMailModel,
-		method: CalendarMethodEnum,
+		method: MailMethodEnum,
 		subject: string,
 		event: CalendarEvent,
 		body: string,
 		sender: string
 	}): Promise<void> {
-		const inviteFile = makeInvitationCalendarFile(event, method, new Date(), getTimeZone())
+		const inviteFile = makeInvitationCalendarFile(event, mailMethodToCalendarMethod(method), new Date(), getTimeZone())
 		sendMailModel.selectSender(sender)
 		sendMailModel.attachFiles([inviteFile])
 		sendMailModel.setSubject(subject)

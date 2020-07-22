@@ -54,7 +54,7 @@ export const _TypeModel: TypeModel = {
 	"associations": {
 		"calendarEventUpdates": {
 			"name": "calendarEventUpdates",
-			"id": 1122,
+			"id": 1120,
 			"since": 42,
 			"type": "AGGREGATION",
 			"cardinality": "ZeroOrOne",

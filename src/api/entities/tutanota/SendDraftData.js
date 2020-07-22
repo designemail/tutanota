@@ -3,7 +3,6 @@
 import {create, TypeRef} from "../../common/EntityFunctions"
 
 import type {AttachmentKeyData} from "./AttachmentKeyData"
-import type {CalendarFileMethod} from "./CalendarFileMethod"
 import type {InternalRecipientKeyData} from "./InternalRecipientKeyData"
 import type {SecureExternalRecipientKeyData} from "./SecureExternalRecipientKeyData"
 
@@ -33,6 +32,15 @@ export const _TypeModel: TypeModel = {
 			"type": "Bytes",
 			"cardinality": "ZeroOrOne",
 			"final": true,
+			"encrypted": false
+		},
+		"calendarMethod": {
+			"name": "calendarMethod",
+			"id": 1118,
+			"since": 42,
+			"type": "Boolean",
+			"cardinality": "One",
+			"final": false,
 			"encrypted": false
 		},
 		"language": {
@@ -82,15 +90,6 @@ export const _TypeModel: TypeModel = {
 			"refType": "AttachmentKeyData",
 			"final": true
 		},
-		"calendarMethods": {
-			"name": "calendarMethods",
-			"id": 1118,
-			"since": 42,
-			"type": "AGGREGATION",
-			"cardinality": "Any",
-			"refType": "CalendarFileMethod",
-			"final": true
-		},
 		"internalRecipientKeyData": {
 			"name": "internalRecipientKeyData",
 			"id": 553,
@@ -133,13 +132,13 @@ export type SendDraftData = {
 
 	_format: NumberString;
 	bucketEncMailSessionKey: ?Uint8Array;
+	calendarMethod: boolean;
 	language: string;
 	mailSessionKey: ?Uint8Array;
 	plaintext: boolean;
 	senderNameUnencrypted: ?string;
 
 	attachmentKeyData: AttachmentKeyData[];
-	calendarMethods: CalendarFileMethod[];
 	internalRecipientKeyData: InternalRecipientKeyData[];
 	secureExternalRecipientKeyData: SecureExternalRecipientKeyData[];
 	mail: IdTuple;

@@ -1,6 +1,6 @@
 //@flow
 
-import type {AlarmIntervalEnum} from "../api/common/TutanotaConstants"
+import type {AlarmIntervalEnum, CalendarMethodEnum} from "../api/common/TutanotaConstants"
 import {AlarmInterval, CalendarAttendeeStatus, EndType, reverse, SECOND_MS} from "../api/common/TutanotaConstants"
 import {fileController} from "../file/FileController"
 import {stringToUtf8Uint8Array, utf8Uint8ArrayToString} from "../api/common/utils/Encoding"
@@ -154,7 +154,7 @@ export function makeInvitationCalendar(versionNumber: string, event: CalendarEve
 }
 
 
-export function makeInvitationCalendarFile(event: CalendarEvent, method: string, now: Date, zone: string): DataFile {
+export function makeInvitationCalendarFile(event: CalendarEvent, method: CalendarMethodEnum, now: Date, zone: string): DataFile {
 	const stringValue = makeInvitationCalendar(env.versionNumber, event, method, now, zone)
 	const data = stringToUtf8Uint8Array(stringValue)
 	const tmpFile = createFile()
