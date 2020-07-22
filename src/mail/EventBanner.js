@@ -41,6 +41,7 @@ export class EventBanner implements MComponent<Attrs> {
 			}, [
 				m(".mt"), // Separate element instead of padding on a parent so that the banner can collapse in height
 				m(EventPreviewView, {event, ownAttendee}),
+				// TODO: do now show own status but just reply status
 				m("", ownAttendee && method === CalendarMethod.REQUEST
 					? ownAttendee.status !== CalendarAttendeeStatus.NEEDS_ACTION
 						? m(".align-self-start.start.smaller", lang.get("eventYourDecision_msg", {"{decision}": decisionString(ownAttendee.status)}))

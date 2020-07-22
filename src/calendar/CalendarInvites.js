@@ -60,20 +60,18 @@ export function showEventDetails(event: CalendarEvent, mail: ?Mail) {
 export function eventDetailsForFile(file: TutanotaFile): Promise<?{event: CalendarEvent, method: CalendarMethodEnum}> {
 	return worker.downloadFileContent(file).then((fileData) => {
 		const parsedEventWithAlarms = getParsedEvent(fileData)
-		if (parsedEventWithAlarms == null) {
-			return null
-		}
-		const {event: parsedEvent, method} = parsedEventWithAlarms
-		return worker.getEventByUid(parsedEventWithAlarms.uid).then((existingEvent) => {
-			if (existingEvent) {
-				// It should be the latest version eventually via CalendarEventUpdates
-				return {event: existingEvent, method}
-			} else {
-				// Set isCopy here to show that this is not created by us
-				parsedEvent.isCopy = true
-				return {event: parsedEvent, method}
-			}
-		})
+		return parsedEventWithAlarms
+
+		// return worker.getEventByUid(parsedEventWithAlarms.uid).then((existingEvent) => {
+		// 	if (existingEvent) {
+		// 		// It should be the latest version eventually via CalendarEventUpdates
+		// 		return {event: existingEvent, method}
+		// 	} else {
+		// 		// Set isCopy here to show that this is not created by us
+		// 		parsedEvent.isCopy = true
+		// 		return {event: parsedEvent, method}
+		// 	}
+		// })
 	})
 }
 

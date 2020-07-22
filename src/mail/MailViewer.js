@@ -10,7 +10,7 @@ import {formatDateTime, formatDateWithWeekday, formatStorageSize, formatTime, ur
 import {windowFacade} from "../misc/WindowFacade"
 import {ease} from "../gui/animation/Easing"
 import type {DomMutation} from "../gui/animation/Animations"
-import {animations, height, opacity, scroll} from "../gui/animation/Animations"
+import {animations, scroll} from "../gui/animation/Animations"
 import {nativeApp} from "../native/NativeWrapper"
 import type {MailBody} from "../api/entities/tutanota/MailBody"
 import {MailBodyTypeRef} from "../api/entities/tutanota/MailBody"
@@ -22,6 +22,7 @@ import {
 	Keys,
 	MailAuthenticationStatus,
 	MailFolderType,
+	MailMethod,
 	MailPhishingStatus,
 	MailReportType,
 	MailState,
@@ -348,7 +349,7 @@ export class MailViewer {
 								},
 								onsubmit: (event: Event) => this._confirmSubmit(event),
 								style: {'line-height': this._bodyLineHeight, 'transform-origin': 'top left'},
-							}, (this._mailBody == null && !this._errorOccurred)
+							}, (this._htmlBody == null && !this._errorOccurred || (this._isInternalCalendarEmail() && this._event == null))
 								? m(".progress-panel.flex-v-center.items-center", {
 									style: {
 										height: '200px'
@@ -357,7 +358,7 @@ export class MailViewer {
 									progressIcon(),
 									m("small", lang.get("loading_msg"))
 								])
-								: ((this._errorOccurred || this.mail._errors || neverNull(this._mailBody)._errors)
+								: ((this._errorOccurred || this.mail._errors || (this._mailBody != null && this._mailBody._errors))
 									? m(ColumnEmptyMessageBox, {
 										message: "corrupted_msg",
 										icon: Icons.Warning,
@@ -382,9 +383,9 @@ export class MailViewer {
 				recipient: this._event.recipient,
 				mail: this.mail,
 				oncreate: (vnode) => {
-					animations.add(vnode.dom, [height(0, vnode.dom.offsetHeight), opacity(0, 1, true)], {delay: 200})
-					vnode.dom.style.height = 0
-					vnode.dom.style.opacity = 0
+					// animations.add(vnode.dom, [height(0, vnode.dom.offsetHeight), opacity(0, 1, true)], {delay: 200})
+					// vnode.dom.style.height = 0
+					// vnode.dom.style.opacity = 0
 				}
 			})
 			: null
@@ -823,8 +824,19 @@ export class MailViewer {
 		})
 	}
 
+	_isInternalCalendarEmail(): boolean {
+		return this.mail.confidential && this.mail.method !== MailMethod.NONE
+	}
+
 	/** @return list of inline referenced cid */
 	_loadMailBody(mail: Mail): Promise<Array<string>> {
+		if (this._isInternalCalendarEmail()) {
+			this._htmlBody = "<div></div>"
+			this._contrastFixNeeded = false
+			this._contentBlocked = false
+			m.redraw()
+			return Promise.resolve([])
+		}
 		return load(MailBodyTypeRef, mail.body).then(body => {
 			this._mailBody = body
 			let sanitizeResult = htmlSanitizer.sanitizeFragment(this._getMailBody(), true, isTutanotaTeamMail(mail))
@@ -904,6 +916,7 @@ export class MailViewer {
 	}
 
 	_renderAttachments(): Children {
+		// TODO: Disable it for calendar file
 		if (this._loadingAttachments) {
 			return m(".flex", [
 				m(".flex-v-center.pl-button", progressIcon()),
