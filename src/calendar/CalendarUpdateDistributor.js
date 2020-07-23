@@ -5,14 +5,16 @@ import type {CalendarAttendeeStatusEnum, MailMethodEnum} from "../api/common/Tut
 import {CalendarMethod, ConversationType, getAttendeeStatus, MailMethod, mailMethodToCalendarMethod} from "../api/common/TutanotaConstants"
 import {calendarAttendeeStatusSymbol, formatEventDuration, getTimeZone} from "./CalendarUtils"
 import type {CalendarEvent} from "../api/entities/tutanota/CalendarEvent"
-import type {MailAddress} from "../api/entities/tutanota/MailAddress"
 import {stringToUtf8Uint8Array, uint8ArrayToBase64} from "../api/common/utils/Encoding"
 import {theme} from "../gui/theme"
 import {assertNotNull, noOp} from "../api/common/utils/Utils"
-import type {EncryptedMailAddress} from "../api/entities/tutanota/EncryptedMailAddress"
 import {SendMailModel} from "../mail/SendMailModel"
 import type {Mail} from "../api/entities/tutanota/Mail"
 import {windowFacade} from "../misc/WindowFacade"
+import type {MailAddress} from "../api/entities/tutanota/MailAddress"
+import type {EncryptedMailAddress} from "../api/entities/tutanota/EncryptedMailAddress"
+import type {CalendarEventAttendee} from "../api/entities/tutanota/CalendarEventAttendee"
+import {createCalendarEventAttendee} from "../api/entities/tutanota/CalendarEventAttendee"
 
 export interface CalendarUpdateDistributor {
 	sendInvite(existingEvent: CalendarEvent, sendMailModel: SendMailModel): Promise<void>;
@@ -135,51 +137,58 @@ export class CalendarMailDistributor implements CalendarUpdateDistributor {
 	}
 }
 
-function organizerLine(event: CalendarEvent) {
-	const {organizer} = event
-	// If organizer is already in the attendees, we don't have to add them separately.
-	if (organizer && event.attendees.find((a) => a.address.address === organizer.address)) {
-		return ""
-	}
-	return `<div style="display: flex"><div style="min-width: 80px">${lang.get("who_label")}:</div><div>${
-		organizer ? `${organizer.name || ""} ${organizer.address} </EXTERNAL_FRAGMENT> (${lang.get("organizer_label")})` : ""}</div></div>`
+function summaryLine(event: CalendarEvent): string {
+	return newLine(lang.get('name_label'), event.summary)
 }
 
 function whenLine(event: CalendarEvent): string {
 	const duration = formatEventDuration(event, getTimeZone())
-	return `<div style="display: flex"><div style="min-width: 80px">${lang.get("when_label")}:</div>${duration}</div>`
+	return newLine(lang.get("when_label"), duration)
 }
 
-function organizerLabel(event, a) {
-	return assertNotNull(event.organizer) === a.address.address ? `(${lang.get("organizer_label")})` : ""
+function organizerLabel(organizer: EncryptedMailAddress, a: CalendarEventAttendee) {
+	return organizer.address === a.address.address ? `(${lang.get("organizer_label")})` : ""
+}
+
+function newLine(label: string, content: string): string {
+	return `<div style="display: flex; margin-top: 8px"><div style="min-width: 120px"><b style="float:right; margin-right:16px">${label}:</b></div>${content}</div>`
+}
+
+function attendeesLine(event: CalendarEvent): string {
+	const {organizer} = event
+	var attendees = ""
+	// If organizer is already in the attendees, we don't have to add them separately.
+	if (organizer && !event.attendees.find((a) => a.address.address === organizer.address)) {
+		attendees = makeAttendee(organizer, createCalendarEventAttendee({address: organizer}))
+	}
+	attendees += event.attendees.map(a => makeAttendee(assertNotNull(organizer), a)).join("\n");
+	return newLine(lang.get("who_label"), `<div>${attendees}</div>`)
+}
+
+function makeAttendee(organizer: EncryptedMailAddress, attendee: CalendarEventAttendee): string {
+	return `<div>
+${attendee.address.name || ""} ${attendee.address.address}
+${(organizerLabel(organizer, attendee))}
+${calendarAttendeeStatusSymbol(getAttendeeStatus(attendee))}</div>`
+}
+
+function locationLine(event: CalendarEvent): string {
+	return event.location ? newLine(lang.get("location_label"), event.location) : ""
+}
+
+function descriptionLine(event: CalendarEvent): string {
+	return event.description ? newLine(lang.get("description_label"), `<div>${event.description}</div>`) : ""
 }
 
 function makeInviteEmailBody(event: CalendarEvent, message: string) {
 	return `<div style="max-width: 685px; margin: 0 auto">
   <h2 style="text-align: center">${message}</h2>
   <div style="margin: 0 auto">
+  	${summaryLine(event)}
     ${whenLine(event)}
-    ${organizerLine(event)}
-    ${event.attendees.map((a) =>
-		`<div style='margin-left: 80px'>
-${a.address.name || ""} ${a.address.address}
-${(organizerLabel(event, a))}
-${calendarAttendeeStatusSymbol(getAttendeeStatus(a))}</div>`)
-	       .join("\n")}
-  </div>
-  <hr style="border: 0; height: 1px; background-color: #ddd">
-  <img style="max-height: 38px; display: block; background-color: white; padding: 4px 8px; border-radius: 4px; margin: 16px auto 0"
-  		src="data:image/svg+xml;base64,${uint8ArrayToBase64(stringToUtf8Uint8Array(theme.logo))}"
-  		alt="logo"/>
-</div>`
-}
-
-function makeResponseEmailBody(event: CalendarEvent, message: string, sender: MailAddress, status: CalendarAttendeeStatusEnum): string {
-	return `<div style="max-width: 685px; margin: 0 auto">
-  <h2 style="text-align: center">${message}</h2>
-  <div style="margin: 0 auto">
-  <div style="display: flex">${lang.get("who_label")}:<div style='margin-left: 80px'>${sender.name + " " + sender.address
-	} ${calendarAttendeeStatusSymbol(status)}</div></div>
+    ${locationLine(event)}
+    ${attendeesLine(event)}
+    ${descriptionLine(event)}
   </div>
   <hr style="border: 0; height: 1px; background-color: #ddd">
   <img style="max-height: 38px; display: block; background-color: white; padding: 4px 8px; border-radius: 4px; margin: 16px auto 0"

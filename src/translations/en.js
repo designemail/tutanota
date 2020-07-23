@@ -1146,9 +1146,11 @@ module.exports = {
 		"eventCopy_msg": "This event was sent from another calendar. Changes will only be visible in your copy of the event",
 		"deleteEventConfirmation_msg": "Are you sure you want to delete this event?",
 		"addGuest_label": "Add a guest",
-		"eventYourDecision_msg": "You replied to this invite. Your decision: {decision}",
+		"alreadyReplied_msg": "You replied to this invite.",
 		"you_label": "You",
 		"sendUpdates_msg": "Send out updates?",
 		"updateSent_msg": "Update sent!",
+		"invalidCalendarFile_msg": "Calendar file is invalid.",
+		"attendeeNotFound_msg": "You are not an attendee of this event.",
 	}
 }

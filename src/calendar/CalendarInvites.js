@@ -47,32 +47,37 @@ export function showEventDetails(event: CalendarEvent, mail: ?Mail) {
 	return Promise.all([
 		loadOrCreateCalendarInfo(),
 		locator.mailModel.getUserMailboxDetails(),
-		event.uid && worker.getEventByUid(event.uid)
-	]).then(([calendarInfo, mailboxDetails, dbEvent]) => {
-		if (dbEvent) {
-			showCalendarEventDialog(dbEvent.startTime, calendarInfo, mailboxDetails, dbEvent, mail)
-		} else {
-			showCalendarEventDialog(event.startTime, calendarInfo, mailboxDetails, event, mail)
-		}
+		getLatestEvent(event)
+	]).then(([calendarInfo, mailboxDetails, latestEvent]) => {
+		showCalendarEventDialog(latestEvent.startTime, calendarInfo, mailboxDetails, latestEvent, mail)
 	})
 }
 
-export function eventDetailsForFile(file: TutanotaFile): Promise<?{event: CalendarEvent, method: CalendarMethodEnum}> {
+export function getEventFromFile(file: TutanotaFile): Promise<?CalendarEvent> {
 	return worker.downloadFileContent(file).then((fileData) => {
-		const parsedEventWithAlarms = getParsedEvent(fileData)
-		return parsedEventWithAlarms
-
-		// return worker.getEventByUid(parsedEventWithAlarms.uid).then((existingEvent) => {
-		// 	if (existingEvent) {
-		// 		// It should be the latest version eventually via CalendarEventUpdates
-		// 		return {event: existingEvent, method}
-		// 	} else {
-		// 		// Set isCopy here to show that this is not created by us
-		// 		parsedEvent.isCopy = true
-		// 		return {event: parsedEvent, method}
-		// 	}
-		// })
+		const parsedEvent = getParsedEvent(fileData)
+		return parsedEvent && parsedEvent.event
 	})
+}
+
+export function getLatestEvent(event: CalendarEvent): Promise<CalendarEvent> {
+
+	const uid = event.uid
+	if (uid) {
+		return worker.getEventByUid(uid).then((existingEvent) => {
+			if (existingEvent) {
+				// It should be the latest version eventually via CalendarEventUpdates
+				return existingEvent
+			} else {
+				// Set isCopy here to show that this is not created by us
+				event.isCopy = true
+				return event
+			}
+		})
+	} else {
+		event.isCopy = true
+		return Promise.resolve(event)
+	}
 }
 
 export function replyToEventInvitation(

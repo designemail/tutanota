@@ -23,6 +23,7 @@ import {
 	MailAuthenticationStatus,
 	MailFolderType,
 	MailMethod,
+	mailMethodToCalendarMethod,
 	MailPhishingStatus,
 	MailReportType,
 	MailState,
@@ -100,7 +101,6 @@ import {ButtonColors, ButtonN, ButtonType} from "../gui/base/ButtonN"
 import {styles} from "../gui/styles"
 import {worker} from "../api/main/WorkerClient"
 import {CALENDAR_MIME_TYPE} from "../calendar/CalendarUtils"
-import {eventDetailsForFile} from "../calendar/CalendarInvites"
 import {createAsyncDropdown, createDropdown} from "../gui/base/DropdownN"
 import {navButtonRoutes} from "../misc/RouteChange"
 import {createEmailSenderListElement} from "../api/entities/sys/EmailSenderListElement"
@@ -114,9 +114,10 @@ import {_TypeModel as MailTypeModel} from "../api/entities/tutanota/Mail"
 import {copyToClipboard} from "../misc/ClipboardUtils"
 import type {GroupInfo} from "../api/entities/sys/GroupInfo"
 import {locator} from "../api/main/MainLocator"
-import type {CalendarEvent} from "../api/entities/tutanota/CalendarEvent"
 import {EventBanner} from "./EventBanner"
 import {checkApprovalStatus} from "../misc/LoginUtils"
+import {getEventFromFile} from "../calendar/CalendarInvites"
+import type {CalendarEvent} from "../api/entities/tutanota/CalendarEvent"
 
 assertMainOrNode()
 
@@ -164,7 +165,7 @@ export class MailViewer {
 	_lastTouchStart: {x: number, y: number, time: number};
 	_domForScrolling: ?HTMLElement
 	_warningDismissed: boolean;
-	_event: ?{|event: CalendarEvent, method: CalendarMethodEnum, recipient: string|};
+	_calendarEventAttachment: ?{|event: CalendarEvent, method: CalendarMethodEnum, recipient: string|};
 
 	constructor(mail: Mail, showFolder: boolean) {
 		if (isDesktop()) {
@@ -349,7 +350,7 @@ export class MailViewer {
 								},
 								onsubmit: (event: Event) => this._confirmSubmit(event),
 								style: {'line-height': this._bodyLineHeight, 'transform-origin': 'top left'},
-							}, (this._htmlBody == null && !this._errorOccurred || (this._isInternalCalendarEmail() && this._event == null))
+							}, (this._htmlBody == null && !this._errorOccurred)
 								? m(".progress-panel.flex-v-center.items-center", {
 									style: {
 										height: '200px'
@@ -376,17 +377,12 @@ export class MailViewer {
 	}
 
 	_renderEventBanner(): Children {
-		return this._event
+		return this._calendarEventAttachment
 			? m(EventBanner, {
-				event: this._event.event,
-				method: this._event.method,
-				recipient: this._event.recipient,
+				event: this._calendarEventAttachment.event,
+				method: this._calendarEventAttachment.method,
+				recipient: this._calendarEventAttachment.recipient,
 				mail: this.mail,
-				oncreate: (vnode) => {
-					// animations.add(vnode.dom, [height(0, vnode.dom.offsetHeight), opacity(0, 1, true)], {delay: 200})
-					// vnode.dom.style.height = 0
-					// vnode.dom.style.opacity = 0
-				}
 			})
 			: null
 	}
@@ -824,19 +820,8 @@ export class MailViewer {
 		})
 	}
 
-	_isInternalCalendarEmail(): boolean {
-		return this.mail.confidential && this.mail.method !== MailMethod.NONE
-	}
-
 	/** @return list of inline referenced cid */
 	_loadMailBody(mail: Mail): Promise<Array<string>> {
-		if (this._isInternalCalendarEmail()) {
-			this._htmlBody = "<div></div>"
-			this._contrastFixNeeded = false
-			this._contentBlocked = false
-			m.redraw()
-			return Promise.resolve([])
-		}
 		return load(MailBodyTypeRef, mail.body).then(body => {
 			this._mailBody = body
 			let sanitizeResult = htmlSanitizer.sanitizeFragment(this._getMailBody(), true, isTutanotaTeamMail(mail))
@@ -879,12 +864,16 @@ export class MailViewer {
 			return Promise.map(mail.attachments, fileId => load(FileTypeRef, fileId))
 			              .then(files => {
 				              const calendarFile = files.find(a => a.mimeType && a.mimeType.startsWith(CALENDAR_MIME_TYPE))
-				              if (calendarFile) {
+				              if (calendarFile && mail.method === MailMethod.ICAL_REQUEST && mail.state === MailState.RECEIVED) {
 					              Promise.all([
-						              eventDetailsForFile(calendarFile),
-						              this._getSenderOfResponseMail(),
-					              ]).then(([parsedEvent, recipient]) => {
-						              this._event = parsedEvent && {event: parsedEvent.event, method: parsedEvent.method, recipient}
+						              getEventFromFile(calendarFile),
+						              this._getSenderOfResponseMail()
+					              ]).then(([event, recipient]) => {
+						              this._calendarEventAttachment = event && {
+							              event,
+							              method: mailMethodToCalendarMethod(downcast(mail.method)),
+							              recipient,
+						              }
 						              m.redraw()
 					              })
 				              }

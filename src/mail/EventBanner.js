@@ -1,18 +1,17 @@
 //@flow
 import m from "mithril"
-import type {CalendarEvent} from "../api/entities/tutanota/CalendarEvent"
 import {MessageBoxN} from "../gui/base/MessageBoxN"
 import {px, size} from "../gui/size"
-import {EventPreviewView} from "../calendar/EventPreviewView"
 import {ButtonN, ButtonType} from "../gui/base/ButtonN"
-import {replyToEventInvitation, showEventDetails} from "../calendar/CalendarInvites"
+import {getLatestEvent, replyToEventInvitation, showEventDetails} from "../calendar/CalendarInvites"
 import type {CalendarAttendeeStatusEnum, CalendarMethodEnum} from "../api/common/TutanotaConstants"
-import {CalendarAttendeeStatus, CalendarMethod} from "../api/common/TutanotaConstants"
+import {CalendarAttendeeStatus, CalendarMethod, ReplyType} from "../api/common/TutanotaConstants"
 import {lang} from "../misc/LanguageViewModel"
 import {BannerButton} from "../gui/base/Banner"
 import {theme} from "../gui/theme"
-import type {CalendarEventAttendee} from "../api/entities/tutanota/CalendarEventAttendee"
 import type {Mail} from "../api/entities/tutanota/Mail"
+import {Dialog} from "../gui/base/Dialog"
+import type {CalendarEvent} from "../api/entities/tutanota/CalendarEvent"
 
 export type Attrs = {
 	event: CalendarEvent,
@@ -39,13 +38,12 @@ export class EventBanner implements MComponent<Attrs> {
 					paddingTop: "0",
 				}
 			}, [
-				m(".mt"), // Separate element instead of padding on a parent so that the banner can collapse in height
-				m(EventPreviewView, {event, ownAttendee}),
-				// TODO: do now show own status but just reply status
-				m("", ownAttendee && method === CalendarMethod.REQUEST
-					? ownAttendee.status !== CalendarAttendeeStatus.NEEDS_ACTION
-						? m(".align-self-start.start.smaller", lang.get("eventYourDecision_msg", {"{decision}": decisionString(ownAttendee.status)}))
-						: renderReplyButtons(mail, event, ownAttendee)
+				m(".mt"),
+				// Separate element instead of padding on a parent so that the banner can collapse in height
+				m("", method === CalendarMethod.REQUEST
+					? mail.replyType === ReplyType.REPLY || (ownAttendee && ownAttendee.status !== CalendarAttendeeStatus.NEEDS_ACTION)
+						? m(".align-self-start.start.smaller", lang.get("alreadyReplied_msg", ))
+						: renderReplyButtons(event, mail, recipient)
 					: null),
 				m(".ml-negative-s.limit-width.align-self-start", m(ButtonN, {
 					label: "viewEvent_action",
@@ -57,33 +55,43 @@ export class EventBanner implements MComponent<Attrs> {
 	}
 }
 
-function renderReplyButtons(previousMail: Mail, event: CalendarEvent, ownAttendee: CalendarEventAttendee) {
-	return m(".flex", [
-		m(BannerButton, {
-			text: lang.get("yes_label"),
-			click: () => sendResponse(event, ownAttendee, CalendarAttendeeStatus.ACCEPTED, previousMail),
-			borderColor: theme.content_button,
-			color: theme.content_fg
-		}),
-		m(BannerButton, {
-			text: lang.get("maybe_label"),
-			click: () => sendResponse(event, ownAttendee, CalendarAttendeeStatus.TENTATIVE, previousMail),
-			borderColor: theme.content_button,
-			color: theme.content_fg
-		}),
-		m(BannerButton, {
-			text: lang.get("no_label"),
-			click: () => sendResponse(event, ownAttendee, CalendarAttendeeStatus.DECLINED, previousMail),
-			borderColor: theme.content_button,
-			color: theme.content_fg
-		}),
-	])
+function renderReplyButtons(event: CalendarEvent, previousMail: Mail, recipient: string) {
+	return [
+		m("", lang.get("invitedToEvent_msg")),
+		m(".flex.items-center.mt", [
+			m(BannerButton, {
+				text: lang.get("yes_label"),
+				click: () => sendResponse(event, recipient, CalendarAttendeeStatus.ACCEPTED, previousMail),
+				borderColor: theme.content_button,
+				color: theme.content_fg
+			}),
+			m(BannerButton, {
+				text: lang.get("maybe_label"),
+				click: () => sendResponse(event, recipient, CalendarAttendeeStatus.TENTATIVE, previousMail),
+				borderColor: theme.content_button,
+				color: theme.content_fg
+			}),
+			m(BannerButton, {
+				text: lang.get("no_label"),
+				click: () => sendResponse(event, recipient, CalendarAttendeeStatus.DECLINED, previousMail),
+				borderColor: theme.content_button,
+				color: theme.content_fg
+			}),
+		])
+	]
 }
 
-function sendResponse(event: CalendarEvent, ownAttendee: CalendarEventAttendee, status: CalendarAttendeeStatusEnum, previousMail: Mail) {
-	replyToEventInvitation(event, ownAttendee, status, previousMail)
-		.then(() => ownAttendee.status = status)
-		.then(m.redraw)
+function sendResponse(event: CalendarEvent, recipient: string, status: CalendarAttendeeStatusEnum, previousMail: Mail) {
+	getLatestEvent(event).then(latestEvent => {
+		const ownAttendee = latestEvent.attendees.find((a) => a.address.address === recipient)
+		if (ownAttendee == null) {
+			Dialog.error("attendeeNotFound_msg")
+			return
+		}
+		replyToEventInvitation(latestEvent, ownAttendee, status, previousMail)
+			.then(() => ownAttendee.status = status)
+			.then(m.redraw)
+	})
 }
 
 function decisionString(status) {

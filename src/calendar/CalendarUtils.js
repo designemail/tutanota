@@ -23,7 +23,7 @@ import type {CalendarRepeatRule} from "../api/entities/tutanota/CalendarRepeatRu
 import {createCalendarRepeatRule} from "../api/entities/tutanota/CalendarRepeatRule"
 import {DAYS_SHIFTED_MS, generateEventElementId, isAllDayEvent} from "../api/common/utils/CommonCalendarUtils"
 import {lang} from "../misc/LanguageViewModel"
-import {formatDate, formatDateTime, formatTime} from "../misc/Formatter"
+import {formatDateTime, formatDateWithMonth, formatTime} from "../misc/Formatter"
 import {size} from "../gui/size"
 import {assertMainOrNode} from "../api/Env"
 import {logins} from "../api/main/LoginController"
@@ -96,10 +96,10 @@ export function parseTime(timeString: string): ?{hours: number, minutes: number}
 	if (suffix) {
 		suffix = suffix.toUpperCase()
 	}
-	if (suffix === "PM" || suffix == "P.M.") {
+	if (suffix === "PM" || suffix === "P.M.") {
 		if (hours > 12) return null
 		if (hours !== 12) hours = hours + 12
-	} else if (suffix === "AM" || suffix == "A.M.") {
+	} else if (suffix === "AM" || suffix === "A.M.") {
 		if (hours > 12) return null
 		if (hours === 12) hours = 0
 	} else if (hours > 23) {
@@ -560,11 +560,11 @@ export function formatEventDuration(event: CalendarEvent, zone: string) {
 	const startTime = getEventStart(event, zone)
 	const endTime = getEventEnd(event, zone)
 	if (isAllDayEvent(event)) {
-		const startString = formatDate(startTime)
+		const startString = formatDateWithMonth(startTime)
 		if (getDiffInDays(endTime, startTime) === 1) {
-			return startString
+			return `${lang.get("allDay_label")}, ${startString}`
 		} else {
-			return `${startString} - ${formatDate(endTime)}`
+			return `${lang.get("allDay_label")}, ${startString} - ${formatDateWithMonth(endTime)}`
 		}
 	} else {
 		const startString = formatDateTime(startTime)
@@ -574,7 +574,7 @@ export function formatEventDuration(event: CalendarEvent, zone: string) {
 		} else {
 			endString = formatDateTime(endTime)
 		}
-		return `${startString} - ${endString}`
+			return `${startString} - ${endString} ${getTimeZone()}`
 	}
 }
 
@@ -589,22 +589,6 @@ export function calendarAttendeeStatusSymbol(status: CalendarAttendeeStatusEnum)
 			return "✓"
 		case CalendarAttendeeStatus.DECLINED:
 			return "❌"
-		default:
-			throw new Error("Unknown calendar attendee status: " + status)
-	}
-}
-
-export function calendarAttendeeStatusDescription(status: CalendarAttendeeStatusEnum): string {
-	switch (status) {
-		case CalendarAttendeeStatus.ADDED:
-		case CalendarAttendeeStatus.NEEDS_ACTION:
-			return lang.get("awaiting_label")
-		case CalendarAttendeeStatus.TENTATIVE:
-			return lang.get("maybe_label")
-		case CalendarAttendeeStatus.ACCEPTED:
-			return lang.get("yes_label")
-		case CalendarAttendeeStatus.DECLINED:
-			return lang.get("no_label")
 		default:
 			throw new Error("Unknown calendar attendee status: " + status)
 	}

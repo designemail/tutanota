@@ -36,7 +36,7 @@ import {lang} from "../misc/LanguageViewModel"
 import {isApp} from "../api/Env"
 import type {LoginController} from "../api/main/LoginController"
 import {logins} from "../api/main/LoginController"
-import {NotFoundError} from "../api/common/error/RestError"
+import {NotFoundError, PreconditionFailedError} from "../api/common/error/RestError"
 import {client} from "../misc/ClientDetector"
 import {insertIntoSortedArray} from "../api/common/utils/ArrayUtils"
 import m from "mithril"
@@ -57,6 +57,7 @@ import {SysService} from "../api/entities/sys/Services"
 import {GroupTypeRef} from "../api/entities/sys/Group"
 import type {AlarmInfo} from "../api/entities/sys/AlarmInfo"
 import type {CalendarRepeatRule} from "../api/entities/tutanota/CalendarRepeatRule"
+import {module as replaced} from "@hot"
 
 
 function eventComparator(l: CalendarEvent, r: CalendarEvent): number {
@@ -546,6 +547,7 @@ export class CalendarModelImpl implements CalendarModel {
 					]).then(([alarms, groupRoot]) => {
 						const alarmInfos = alarms.map((a) => a.alarmInfo)
 						return this.updateEvent(newEvent, alarmInfos, "", groupRoot, dbEvent)
+						           .catch(PreconditionFailedError, () => console.log("Precondition error when processing calendar update"))
 					})
 				}
 			})
@@ -713,3 +715,7 @@ function repeatRulesEqual(repeatRule: ?CalendarRepeatRule, repeatRule2: ?Calenda
 }
 
 export const calendarModel = new CalendarModelImpl(new Notifications, locator.eventController, worker, logins)
+
+if (replaced) {
+	Object.assign(calendarModel, replaced.calendarModel)
+}
