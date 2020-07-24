@@ -76,6 +76,7 @@ export function showCalendarEventDialog(date: Date, calendars: Map<Id, CalendarI
 	const endTypeValues = createEndTypeValues()
 	const repeatEndDatePicker = new DatePicker(startOfTheWeekOffset, "emptyString_msg", "emptyString_msg", true)
 	repeatEndDatePicker.date.map((date) => viewModel.onRepeatEndDateSelected(date))
+	let finished = false
 
 
 	const endOccurrencesStream = memoized(stream)
@@ -117,6 +118,9 @@ export function showCalendarEventDialog(date: Date, calendars: Map<Id, CalendarI
 		.setValue(viewModel.note)
 
 	const okAction = () => {
+		if (finished) {
+			return
+		}
 		const description = descriptionEditor.getValue()
 		if (description === "<div><br></div>") {
 			viewModel.changeDescription("")
@@ -156,14 +160,20 @@ export function showCalendarEventDialog(date: Date, calendars: Map<Id, CalendarI
 			})
 		}
 
-		Promise.resolve().then(() => {
+		function showProgress(p: Promise<mixed>) {
+			return showProgressDialog("pleaseWait_msg", p)
+		}
 
-			return showProgressDialog("pleaseWait_msg",
-				viewModel.saveAndSend({askForUpdates, askInsecurePassword: () => Dialog.confirm("presharedPasswordNotStrongEnough_msg")})
-				         .then((shouldClose) => shouldClose && finish()))
+		Promise.resolve().then(() => {
+			return viewModel
+				.saveAndSend({
+					askForUpdates,
+					showProgress,
+					askInsecurePassword: () => Dialog.confirm("presharedPasswordNotStrongEnough_msg")
+				})
+				.then((shouldClose) => shouldClose && finish())
 				.catch(UserError, (e) => Dialog.error(() => e.message))
 		})
-
 	}
 
 	const attendeesField = makeBubbleTextField(viewModel)
@@ -322,6 +332,8 @@ export function showCalendarEventDialog(date: Date, calendars: Map<Id, CalendarI
 			: null
 	}
 
+	viewModel.sendingOutUpdate.map(m.redraw)
+
 	function renderDialogContent() {
 		startDatePicker.setDate(viewModel.startDate)
 		endDatePicker.setDate(viewModel.endDate)
@@ -378,6 +390,8 @@ export function showCalendarEventDialog(date: Date, calendars: Map<Id, CalendarI
 	}
 
 	function finish() {
+		console.log("finished")
+		finished = true
 		viewModel.dispose()
 		dialog.close()
 	}

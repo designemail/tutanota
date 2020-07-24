@@ -49,6 +49,7 @@ o.spec("CalendarEventViewModel", function () {
 	let updateModel: SendMailModel
 	let cancelModel: SendMailModel
 	let responseModel: SendMailModel
+	let showProgress = noOp
 
 	function init({
 		              userController = makeUserController(),
@@ -390,7 +391,7 @@ o.spec("CalendarEventViewModel", function () {
 			const newDescription = "new description"
 			viewModel.changeDescription(newDescription)
 
-			o(await viewModel.saveAndSend({askForUpdates, askInsecurePassword})).deepEquals(true)
+			o(await viewModel.saveAndSend({askForUpdates, askInsecurePassword, showProgress})).deepEquals(true)
 
 			const [createdEvent] = calendarModel.createEvent.calls[0].args
 			o(createdEvent.summary).equals("Summary")
@@ -410,7 +411,7 @@ o.spec("CalendarEventViewModel", function () {
 
 			viewModel.addAttendee(newGuest)
 
-			o(await viewModel.saveAndSend({askForUpdates, askInsecurePassword})).deepEquals(true)
+			o(await viewModel.saveAndSend({askForUpdates, askInsecurePassword, showProgress})).deepEquals(true)
 
 			o(calendarModel.createEvent.calls.length).equals(1)("created event")
 			o(distributor.sendInvite.calls[0].args[1]).deepEquals(inviteModel)
@@ -446,7 +447,7 @@ o.spec("CalendarEventViewModel", function () {
 			viewModel.onStartDateSelected(new Date(2020, 4, 3))
 			askForUpdates = o.spy(() => Promise.resolve(true))
 
-			o(await viewModel.saveAndSend({askForUpdates, askInsecurePassword})).equals(true)
+			o(await viewModel.saveAndSend({askForUpdates, askInsecurePassword, showProgress})).equals(true)
 			o(calendarModel.updateEvent.calls.length).equals(1)("created event")
 			o(distributor.sendUpdate.calls[0].args[1]).equals(updateModel)
 			o(distributor.sendCancellation.calls).deepEquals([])
@@ -488,7 +489,7 @@ o.spec("CalendarEventViewModel", function () {
 			viewModel.removeAttendee(toRemoveGuest)
 			askForUpdates = o.spy(() => Promise.resolve(true))
 
-			await viewModel.saveAndSend({askForUpdates, askInsecurePassword})
+			await viewModel.saveAndSend({askForUpdates, askInsecurePassword, showProgress})
 
 			o(calendarModel.updateEvent.calls.length).equals(1)("created event")
 			o(distributor.sendUpdate.calls[0].args[1]).equals(updateModel)("update")
@@ -527,7 +528,7 @@ o.spec("CalendarEventViewModel", function () {
 			askForUpdates = o.spy(() => Promise.resolve(true))
 			askInsecurePassword = o.spy(() => Promise.resolve(true))
 
-			o(await viewModel.saveAndSend({askForUpdates, askInsecurePassword})).equals(true)
+			o(await viewModel.saveAndSend({askForUpdates, askInsecurePassword, showProgress})).equals(true)
 			o(calendarModel.updateEvent.calls.length).equals(1)("created event")
 			o(distributor.sendUpdate.calls[0].args[1]).equals(updateModel)
 			o(distributor.sendCancellation.calls).deepEquals([])
@@ -562,7 +563,7 @@ o.spec("CalendarEventViewModel", function () {
 			askForUpdates = o.spy(() => Promise.resolve(true))
 			askInsecurePassword = o.spy(() => Promise.resolve(false))
 
-			o(await viewModel.saveAndSend({askForUpdates, askInsecurePassword})).equals(false)
+			o(await viewModel.saveAndSend({askForUpdates, askInsecurePassword, showProgress})).equals(false)
 			o(calendarModel.updateEvent.calls.length).equals(0)
 			o(distributor.sendUpdate.calls.length).equals(0)
 			o(distributor.sendCancellation.calls).deepEquals([])
@@ -604,7 +605,7 @@ o.spec("CalendarEventViewModel", function () {
 			viewModel.removeAttendee(toRemoveGuest)
 			askForUpdates = o.spy(() => Promise.resolve(false))
 
-			o(await viewModel.saveAndSend({askForUpdates, askInsecurePassword})).equals(true)
+			o(await viewModel.saveAndSend({askForUpdates, askInsecurePassword, showProgress})).equals(true)
 
 			o(calendarModel.updateEvent.calls.length).equals(1)("created event")
 			o(distributor.sendUpdate.calls).deepEquals([])
@@ -641,7 +642,7 @@ o.spec("CalendarEventViewModel", function () {
 			viewModel.removeAttendee(toRemoveGuest)
 			askForUpdates = o.spy(() => Promise.resolve(true))
 
-			o(await viewModel.saveAndSend({askForUpdates, askInsecurePassword})).equals(true)
+			o(await viewModel.saveAndSend({askForUpdates, askInsecurePassword, showProgress})).equals(true)
 			o(calendarModel.updateEvent.calls.length).equals(1)("created event")
 			o(distributor.sendCancellation.calls[0].args[1]).equals(cancelModel)
 			o(cancelModel._bccRecipients.map(getAddress)).deepEquals([toRemoveGuest.address.address])
@@ -672,7 +673,7 @@ o.spec("CalendarEventViewModel", function () {
 			})
 			const viewModel = init({calendars, existingEvent, calendarModel, distributor, mail})
 			viewModel.selectGoing(CalendarAttendeeStatus.ACCEPTED)
-			o(await viewModel.saveAndSend({askForUpdates, askInsecurePassword})).equals(true)
+			o(await viewModel.saveAndSend({askForUpdates, askInsecurePassword, showProgress})).equals(true)
 
 			// As it is a "new" event, we must create it, not update
 			const [createdEvent] = calendarModel.createEvent.calls[0].args
@@ -701,7 +702,7 @@ o.spec("CalendarEventViewModel", function () {
 			const existingEvent = createCalendarEvent({_id: ["listId", "eventId"], startTime, endTime})
 			const viewModel = init({calendars, existingEvent, calendarModel})
 
-			o(await viewModel.saveAndSend({askForUpdates, askInsecurePassword})).deepEquals(true)
+			o(await viewModel.saveAndSend({askForUpdates, askInsecurePassword, showProgress})).deepEquals(true)
 			const [createdEvent] = calendarModel.updateEvent.calls[0].args
 			o(createdEvent.startTime.toISOString()).deepEquals(startTime.toISOString())
 			o(createdEvent.endTime.toISOString()).deepEquals(endTime.toISOString())
@@ -719,7 +720,7 @@ o.spec("CalendarEventViewModel", function () {
 			viewModel.addAttendee(mailAddress.address)
 
 
-			o(await viewModel.saveAndSend({askForUpdates, askInsecurePassword})).equals(true)
+			o(await viewModel.saveAndSend({askForUpdates, askInsecurePassword, showProgress})).equals(true)
 			o(calendarModel.createEvent.calls.length).equals(1)("created event")
 			o(distributor.sendInvite.calls[0].args[1]).equals(inviteModel)
 			o(inviteModel._bccRecipients.map(getAddress)).deepEquals([newGuest])
@@ -750,7 +751,7 @@ o.spec("CalendarEventViewModel", function () {
 			const viewModel = init({calendars, distributor, userController, existingEvent})
 			const askForUpdates = o.spy(() => Promise.resolve(true))
 
-			const result = await viewModel.saveAndSend({askForUpdates, askInsecurePassword})
+			const result = await viewModel.saveAndSend({askForUpdates, askInsecurePassword, showProgress})
 
 			o(distributor.sendUpdate.calls[0].args[1]).equals(updateModel)
 			o(updateModel._bccRecipients.map(getAddress)).deepEquals([anotherAttendee.address.address])
@@ -776,7 +777,7 @@ o.spec("CalendarEventViewModel", function () {
 			askForUpdates = o.spy(() => Promise.resolve(true))
 
 			viewModel.addAttendee(mailAddress.address)
-			const result = await viewModel.saveAndSend({askForUpdates, askInsecurePassword})
+			const result = await viewModel.saveAndSend({askForUpdates, askInsecurePassword, showProgress})
 
 			o(distributor.sendUpdate.calls[0].args[1]).equals(updateModel)
 			o(updateModel._bccRecipients.map(getAddress)).deepEquals([anotherAttendee.address.address])
@@ -801,7 +802,7 @@ o.spec("CalendarEventViewModel", function () {
 				attendees: [ownAttendee],
 			})
 			const viewModel = init({calendars, distributor, userController, existingEvent})
-			o(await viewModel.saveAndSend({askForUpdates, askInsecurePassword})).equals(true)
+			o(await viewModel.saveAndSend({askForUpdates, askInsecurePassword, showProgress})).equals(true)
 			o(askForUpdates.calls.length).equals(0)
 			o(askInsecurePassword.calls.length).equals(0)
 		})
@@ -823,7 +824,7 @@ o.spec("CalendarEventViewModel", function () {
 			const viewModel = init({calendarModel, calendars, existingEvent})
 
 			viewModel.addAlarm(AlarmInterval.FIVE_MINUTES)
-			o(await viewModel.saveAndSend({askForUpdates, askInsecurePassword})).equals(true)
+			o(await viewModel.saveAndSend({askForUpdates, askInsecurePassword, showProgress})).equals(true)
 
 			o(calendarModel.updateEvent.calls.length).equals(1)("Did update event")
 			o(askForUpdates.calls.length).equals(0)

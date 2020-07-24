@@ -128,6 +128,8 @@ export class CalendarEventViewModel {
 	/** Our own attendee, it should not be included in any of the sendMailModels. */
 	+_ownAttendee: Stream<?EncryptedMailAddress>;
 	_responseTo: ?Mail
+	+sendingOutUpdate: Stream<boolean>
+	_processing: boolean;
 
 	constructor(
 		userController: IUserController,
@@ -158,6 +160,8 @@ export class CalendarEventViewModel {
 		this._sendModelFactory = () => sendMailModelFactory(mailboxDetail, "response")
 		this._mailAddresses = getEnabledMailAddressesWithUser(mailboxDetail, userController.userGroupInfo)
 		this._ownAttendee = stream(null)
+		this.sendingOutUpdate = stream(false)
+		this._processing = false
 
 		this.attendees = stream.merge(
 			[this._inviteModel.recipientsChanged, this._updateModel.recipientsChanged, this._guestStatuses, this._ownAttendee]
@@ -572,8 +576,17 @@ export class CalendarEventViewModel {
 	 * @reject UserError
 	 */
 	saveAndSend(
-		{askForUpdates, askInsecurePassword}: {askForUpdates: () => Promise<boolean>, askInsecurePassword: () => Promise<boolean>}
+		{askForUpdates, askInsecurePassword, showProgress}: {
+			askForUpdates: () => Promise<boolean>,
+			askInsecurePassword: () => Promise<boolean>,
+			showProgress: (Promise<mixed> => mixed),
+		}
 	): Promise<EventCreateResult> {
+		console.log("saveAndSend", this._processing)
+		if (this._processing) {
+			return Promise.resolve(false)
+		}
+		this._processing = true
 		return Promise.resolve().then(() => {
 			// We have to use existing instance to get all the final fields correctly
 			// Using clone feels hacky but otherwise we need to save all attributes of the existing event somewhere and if dialog is
@@ -684,32 +697,47 @@ export class CalendarEventViewModel {
 						return Promise.resolve(sendOutUpdate ? passwordCheck() : true)
 						              .then((send) => {
 							              if (!send) return false
-							              return this._sendInvite(newEvent)
-							                         .then(() => this._cancelModel._bccRecipients.length
-								                         ? this._distributor.sendCancellation(newEvent, this._cancelModel)
-								                         : Promise.resolve())
-							                         .then(() => doCreateEvent())
-							                         .then(() => {
-								                         if (sendOutUpdate && existingAttendees.length) {
-									                         return this._distributor.sendUpdate(newEvent, this._updateModel)
-								                         }
-							                         })
-							                         .then(() => true)
+
+							              const p = this._sendInvite(newEvent)
+							                            .then(() => this._cancelModel._bccRecipients.length
+								                            ? this._distributor.sendCancellation(newEvent, this._cancelModel)
+								                            : Promise.resolve())
+							                            .then(() => doCreateEvent())
+							                            .then(() => {
+								                            if (sendOutUpdate && existingAttendees.length) {
+									                            return this._distributor.sendUpdate(newEvent, this._updateModel)
+								                            }
+							                            })
+							                            .then(() => true)
+							              showProgress(p)
+							              return p
 						              })
 					})
 				} else {
 					// just create the event if there are no existing recipients
 					return passwordCheck().then((send) => {
 						if (!send) return false
-						return this._sendInvite(newEvent)
-						           .then(() => doCreateEvent())
-						           .then(() => true)
-
+						const p = this._sendInvite(newEvent)
+						              .then(() => doCreateEvent())
+						              .then(() => true)
+						showProgress(p)
+						return p
 					})
 				}
 			} else {
-				return passwordCheck().then((send) => send && doCreateEvent().then(() => true))
+				return passwordCheck()
+					.then((send) => {
+						if (send) {
+							const p = doCreateEvent()
+							showProgress(p)
+							return p
+						}
+					})
+					.then(() => true)
 			}
+		}).finally(() => {
+			console.log("finished saving", this._processing)
+			this._processing = false
 		})
 	}
 
