@@ -50,22 +50,24 @@ class Modal {
 							style: {
 								zIndex: 100 + i,
 							},
-							onbeforeremove: vnode =>
-								(wrapper.needsBg
-										? Promise.all([
-											this.addAnimation(vnode.dom, false).then(() => {
-												if (this.components.length === 0) {
-													this.visible = false
-												}
-											}),
-											wrapper.component.hideAnimation()
-										])
-										: Promise.resolve().then(() => {
+							onbeforeremove: vnode => {
+								if (wrapper.needsBg) {
+									return Promise.all([
+										this.addAnimation(vnode.dom, false).then(() => {
 											if (this.components.length === 0) {
 												this.visible = false
 											}
-										})
-								).then(() => m.redraw()),
+										}),
+										wrapper.component.hideAnimation()
+									]).then(() => m.redraw())
+								} else {
+									if (this.components.length === 0) {
+										this.visible = false
+									}
+									return wrapper.component.hideAnimation()
+									              .then(() => m.redraw())
+								}
+							}
 						},
 						[
 							m(wrapper.component)

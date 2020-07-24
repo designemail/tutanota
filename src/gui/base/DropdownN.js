@@ -1,7 +1,7 @@
 // @flow
 import m from "mithril"
 import {modal} from "./Modal"
-import {animations, height, width} from "./../animation/Animations"
+import {animations, opacity, transform} from "./../animation/Animations"
 import {ease} from "../animation/Easing"
 import {px, size} from "../size"
 import {focusNext, focusPrevious} from "../../misc/KeyManager"
@@ -99,7 +99,22 @@ export class DropdownN {
 			return m(".dropdown-content.plr-l.scroll.abs", {
 					oncreate: (vnode) => {
 						this.setContentHeight(vnode.dom)
-						this.show(vnode.dom)
+						this._domContents = vnode.dom
+						this._buttonsHeight = this._visibleChildren()
+						                          .reduce((sum, current) => sum + size.button_height, 0) + size.vpad_small * 2
+
+						const maxHeight = this._buttonsHeight + this._getFilterHeight()
+						if (this.origin) {
+							showDropdown(this.origin, this._domDropdown, maxHeight, this._width).then(() => {
+									if (this._domInput && !client.isMobileDevice()) {
+										this._domInput.focus()
+									} else {
+										const button = vnode.dom.querySelector("button")
+										button && button.focus()
+									}
+								}
+							)
+						}
 						window.requestAnimationFrame(() => {
 							if (document.activeElement && typeof document.activeElement.blur === "function") {
 								document.activeElement.blur()
@@ -135,7 +150,7 @@ export class DropdownN {
 		}
 
 		this.view = (): VirtualElement => {
-			return m(".dropdown-panel.elevated-bg.border-radius.backface_fix", {
+			return m(".dropdown-panel.elevated-bg.border-radius.backface_fix.dropdown-shadow", {
 					oncreate: vnode => this._domDropdown = vnode.dom,
 					onkeypress: e => {
 						if (this._domInput) {
@@ -238,55 +253,6 @@ export class DropdownN {
 		return true
 	}
 
-	show(domElement: HTMLElement) {
-		this._domContents = domElement
-		if (this.origin) {
-			let left = this.origin.left
-			let right = window.innerWidth - this.origin.right
-			if (left < right) {
-				this._domDropdown.style.left = left + "px"
-				this._domDropdown.style.right = ''
-			} else {
-				this._domDropdown.style.left = ''
-				this._domDropdown.style.right = right + "px"
-			}
-			let top = this.origin.bottom
-			let bottom = window.innerHeight - (this.origin.bottom - this.origin.height)
-			if (top < bottom) {
-				this._domDropdown.style.top = top + "px"
-				this._domDropdown.style.bottom = ''
-			} else {
-				this._domDropdown.style.top = ''
-				this._domDropdown.style.bottom = bottom + "px"
-			}
-
-			this._buttonsHeight = this._visibleChildren()
-			                          .reduce((sum, current) => sum + size.button_height, 0) + size.vpad_small * 2
-
-			this.maxHeight = Math.min(
-				this._buttonsHeight + this._getFilterHeight(),
-				Math.max(window.innerHeight - top, window.innerHeight - bottom) - 10
-			)
-
-			return animations.add(this._domDropdown, [
-				width(0, this._width),
-				height(0, this.maxHeight)
-			], {easing: ease.out}).then(() => {
-				if (this.maxHeight - this._getFilterHeight() < this._buttonsHeight) {
-					// do not show the scrollbar during the animation.
-					this._domContents.style.maxHeight = px(this.maxHeight - this._getFilterHeight())
-					this._domContents.style.overflowY = client.overflowAuto
-				}
-				if (this._domInput && !client.isMobileDevice()) {
-					this._domInput.focus()
-				} else {
-					const button = this._domDropdown.querySelector("button")
-					button && button.focus()
-				}
-			})
-		}
-	}
-
 	setContentHeight(domElement: HTMLElement) {
 		if (this._buttonsHeight > 0) {
 			// in ie the height of dropdown-content is too big because of the line-height. to prevent this set the height here.
@@ -296,17 +262,9 @@ export class DropdownN {
 
 	/**
 	 * Is invoked from modal as the two animations (background layer opacity and dropdown) should run in parallel
-	 * @returns {Promise.<void>}
 	 */
 	hideAnimation(): Promise<void> {
-		if (!this._domContents || !this._domDropdown) {
-			return Promise.resolve()
-		}
-		this._domDropdown.style.overflowY = 'hidden'
-		return animations.add(this._domDropdown, [
-			width(this._width, 0),
-			height(this.maxHeight, 0)
-		], {easing: ease.out})
+		return Promise.resolve()
 	}
 
 	_visibleChildren(): Array<DropDownChildAttrs> {
@@ -352,7 +310,7 @@ export function createAsyncDropdown(lazyButtons: lazyAsync<$ReadOnlyArray<DropDo
 		buttons.then(buttons => {
 			let dropdown = new DropdownN(() => buttons, width)
 			dropdown.setOrigin(dom.getBoundingClientRect())
-			modal.displayUnique(dropdown)
+			modal.displayUnique(dropdown, false)
 		})
 	}: clickHandler)
 }
@@ -387,4 +345,52 @@ export function attachDropdown(
 			}
 		}
 	})
+}
+
+export function showDropdown(origin: PosRect, domDropdown: HTMLElement, contentHeight: number, contentWidth: number) {
+	let left = origin.left
+	let right = window.innerWidth - origin.right
+	let transformOrigin = ""
+	let top = origin.bottom
+	let bottom = window.innerHeight - (origin.bottom - origin.height)
+	if (top < bottom) {
+		transformOrigin += "top"
+		domDropdown.style.top = top + "px"
+		domDropdown.style.bottom = ''
+	} else {
+		transformOrigin += "bottom"
+		domDropdown.style.top = ''
+		domDropdown.style.bottom = bottom + "px"
+	}
+	let width = contentWidth
+	if (left < right) {
+		transformOrigin += " left"
+		if (left + contentWidth > window.innerWidth) {
+			left = 0
+			width = Math.min(width, window.innerWidth)
+		}
+		domDropdown.style.left = left + "px"
+		domDropdown.style.right = ''
+	} else {
+		transformOrigin += " right"
+		if (right - contentWidth < 0) {
+			right = 0
+			width = Math.min(width, window.innerWidth)
+		}
+		domDropdown.style.left = ''
+		domDropdown.style.right = right + "px"
+	}
+
+	const maxHeight = Math.min(
+		contentHeight,
+		Math.max(window.innerHeight - top, window.innerHeight - bottom) - 10
+	)
+	domDropdown.style.width = px(width)
+	domDropdown.style.height = px(maxHeight)
+	domDropdown.style.transformOrigin = transformOrigin
+
+	return animations.add(domDropdown, [
+		opacity(0, 1, true),
+		transform("scale", 0.5, 1)
+	], {easing: ease.out})
 }

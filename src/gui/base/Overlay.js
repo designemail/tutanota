@@ -1,8 +1,7 @@
 //@flow
 import m from "mithril"
 import type {DomMutation} from "../animation/Animations"
-import {animations, hexToRgb} from "../animation/Animations"
-import {theme} from "../theme"
+import {animations} from "../animation/Animations"
 import {requiresStatusBarHack} from "../main-styles"
 import {ease} from "../animation/Easing"
 
@@ -25,10 +24,6 @@ type OverlayAttrs = {
 }
 
 const overlays: Array<[OverlayAttrs, ?HTMLElement, number]> = []
-const boxShadow = (() => {
-	const {r, g, b} = hexToRgb(theme.modal_bg)
-	return `0 2px 12px rgba(${r}, ${g}, ${b}, 0.4), 0 10px 40px rgba(${r}, ${g}, ${b}, 0.3)`
-})()
 let key = 0
 
 export function displayOverlay(position: PositionRect, component: Component, createAnimation?: AnimationProvider,
@@ -64,7 +59,7 @@ export const overlay = {
 		"aria-hidden": overlays.length === 0
 	}, overlays.map((overlayAttrs) => {
 		const [attrs, dom, key] = overlayAttrs
-		return m(".abs.elevated-bg", {
+		return m(".abs.elevated-bg.dropdown-shadow", {
 			key,
 			style: {
 				width: attrs.position.width,
@@ -74,7 +69,6 @@ export const overlay = {
 				left: attrs.position.left,
 				height: attrs.position.height,
 				'z-index': 200,
-				'box-shadow': boxShadow,
 				'margin-top': (requiresStatusBarHack() ? "20px" : 'env(safe-area-inset-top)') // insets for iPhone X
 			},
 			oncreate: (vnode: Vnode<any>) => {

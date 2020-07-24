@@ -1,9 +1,9 @@
 //@flow
 import type {Shortcut} from "../misc/KeyManager"
 import m from "mithril"
-import {px} from "../gui/size"
-import {CALENDAR_EVENT_HEIGHT, getEventStart, getTimeZone} from "./CalendarUtils"
-import {animations, opacity, transform} from "../gui/animation/Animations"
+import {px, size} from "../gui/size"
+import {getEventStart, getTimeZone} from "./CalendarUtils"
+import {animations, height, width} from "../gui/animation/Animations"
 import {ease} from "../gui/animation/Easing"
 import {ButtonColors, ButtonN, ButtonType} from "../gui/base/ButtonN"
 import {Icons} from "../gui/base/icons/Icons"
@@ -12,11 +12,13 @@ import {modal} from "../gui/base/Modal"
 import {EventPreviewView} from "./EventPreviewView"
 import type {CalendarEvent} from "../api/entities/tutanota/CalendarEvent"
 import {Dialog} from "../gui/base/Dialog"
-import {styles} from "../gui/styles"
 import type {CalendarInfo} from "./CalendarView"
 import {CalendarEventViewModel, createCalendarEventViewModel} from "./CalendarEventViewModel"
 import type {MailboxDetail} from "../mail/MailModel"
 import {UserError} from "../api/common/error/UserError"
+import {client} from "../misc/ClientDetector"
+import type {PosRect} from "../gui/base/Dropdown"
+import {showDropdown} from "../gui/base/DropdownN"
 
 export class CalendarEventPopup implements ModalComponent {
 	_calendarEvent: CalendarEvent;
@@ -42,35 +44,19 @@ export class CalendarEventPopup implements ModalComponent {
 	}
 
 	show() {
-		if (styles.isDesktopLayout()) {
-			modal.displayUnique(this, false)
-		} else {
-			showMobileDialog(this._viewModel, this._calendarEvent, () => this._onEditEvent())
-		}
+		modal.displayUnique(this, false)
 	}
 
 	view(vnode: Vnode<any>) {
-		return m(".abs.content-bg.plr.border-radius", {
+		return m(".abs.content-bg.plr.border-radius.dropdown-shadow", {
 				style: {
 					width: "400px",
-					boxShadow: "0 24px 38px 3px rgba(0,0,0,0.14),0 9px 46px 8px rgba(0,0,0,0.12),0 11px 15px -7px rgba(0,0,0,0.2)"
+					opacity: "0", // see hack description below
 				},
 				oncreate: ({dom}) => {
-					const pos = this._rect
-					if (pos.top < window.innerHeight / 2) {
-						dom.style.top = px(pos.top + CALENDAR_EVENT_HEIGHT + 4)
-					} else {
-						dom.style.bottom = px(window.innerHeight - pos.top)
-					}
-					if (pos.left < window.innerWidth / 2) {
-						dom.style.left = px(pos.left)
-					} else {
-						dom.style.right = px(window.innerWidth - pos.right)
-					}
-					animations.add(dom, [transform("translateX", -40, 0), opacity(0, 1, true)], {
-						duration: 100,
-						easing: ease.in
-					})
+					// This is a hack to get "natureal" view size but render it without apacity first and then show dropdown with inferred
+					// size.
+					setTimeout(() => showDropdown(this._rect, dom, dom.offsetHeight, 400), 24)
 				},
 			},
 			[
