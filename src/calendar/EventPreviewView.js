@@ -17,12 +17,13 @@ import {iconForAttendeeStatus} from "./CalendarEventEditDialog"
 
 export type Attrs = {
 	event: CalendarEvent,
+	limitDescriptionHeight: boolean,
 }
 
 export class EventPreviewView implements MComponent<Attrs> {
 	_sanitizedDescription: (string) => string = memoized((html) => htmlSanitizer.sanitize(html, true).text)
 
-	view({attrs: {event}}: Vnode<Attrs>) {
+	view({attrs: {event, limitDescriptionHeight}}: Vnode<Attrs>) {
 		return m(".flex.col", [
 			m(".flex.col.smaller", [
 				m(".flex.pb-s.items-center", [renderSectionIndicator(BootIcons.Calendar), m(".h3", event.summary)]),
@@ -33,7 +34,7 @@ export class EventPreviewView implements MComponent<Attrs> {
 				),
 				event.location ? m(".flex.pb-s.items-center", [renderSectionIndicator(Icons.Pin), event.location]) : null,
 				event.attendees.length
-					? m(".flex.pb-s.items-center", [
+					? m(".flex.pb-s", [
 						renderSectionIndicator(BootIcons.Contacts),
 						m(".flex-wrap", event.attendees.map(a => m(".flex.items-center", [
 							m(Icon, {icon: iconForAttendeeStatus[a.status], style: {fill: theme.content_fg}, class: "mr-s"}),
@@ -42,11 +43,11 @@ export class EventPreviewView implements MComponent<Attrs> {
 					])
 					: null,
 				!!event.description
-					? m(".flex.pb-s.items-start.scroll", {
-						style: {maxHeight: "100px"},
-					}, [
+					? m(".flex.pb-s.items-start", [
 						renderSectionIndicator(Icons.AlignLeft, {marginTop: "2px"}),
-						m("div", m.trust(this._sanitizedDescription(event.description))),
+						limitDescriptionHeight
+							? m(".scroll.full-width", {style: {maxHeight: "100px"}}, m.trust(this._sanitizedDescription(event.description)))
+							: m("", m.trust(this._sanitizedDescription(event.description)))
 					])
 					: null,
 			]),

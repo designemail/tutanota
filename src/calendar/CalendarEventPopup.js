@@ -104,7 +104,7 @@ export class CalendarEventPopup implements ModalComponent {
 						colors: ButtonColors.DrawerNav,
 					}),
 				]),
-				m(EventPreviewView, {event: this._calendarEvent}),
+				m(EventPreviewView, {event: this._calendarEvent, limitDescriptionHeight: true}),
 			],
 		)
 	}
@@ -167,7 +167,7 @@ function showMobileDialog(viewModel: CalendarEventViewModel, event: CalendarEven
 			: []
 		)
 	}, {
-		view: () => m(".mt.pl-s.pr-s", m(EventPreviewView, {event}))
+		view: () => m(".mt.pl-s.pr-s", m(EventPreviewView, {event, limitDescriptionHeight: false}))
 	}).show()
 }
 

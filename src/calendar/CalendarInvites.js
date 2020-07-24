@@ -95,10 +95,14 @@ export function replyToEventInvitation(
 		loadOrCreateCalendarInfo(),
 		locator.mailModel.getMailboxDetailsForMail(previousMail)
 	]).then(([calendars, mailboxDetails]) => {
-		const calendar = firstThrow(Array.from(calendars.values()))
+		const calendar = logins.isInternalUserLoggedIn() ? firstThrow(Array.from(calendars.values())) : null
 		const sendMailModel = new SendMailModel(logins, locator.mailModel, locator.contactModel, locator.eventController, mailboxDetails)
 		return calendarUpdateDistributor.sendResponse(eventClone, sendMailModel, foundAttendee.address.address, previousMail, decision)
 		                                .catch(UserError, (e) => Dialog.error(() => e.message))
-		                                .then(() => calendarModel.createEvent(eventClone, [], getTimeZone(), calendar.groupRoot))
+		                                .then(() => {
+			                                if (calendar) {
+				                                calendarModel.createEvent(eventClone, [], getTimeZone(), calendar.groupRoot)
+			                                }
+		                                })
 	})
 }
