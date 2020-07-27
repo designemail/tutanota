@@ -1,10 +1,8 @@
 //@flow
 import type {Shortcut} from "../misc/KeyManager"
 import m from "mithril"
-import {px, size} from "../gui/size"
+import {px} from "../gui/size"
 import {getEventStart, getTimeZone} from "./CalendarUtils"
-import {animations, height, width} from "../gui/animation/Animations"
-import {ease} from "../gui/animation/Easing"
 import {ButtonColors, ButtonN, ButtonType} from "../gui/base/ButtonN"
 import {Icons} from "../gui/base/icons/Icons"
 import type {ModalComponent} from "../gui/base/Modal"
@@ -16,8 +14,6 @@ import type {CalendarInfo} from "./CalendarView"
 import {CalendarEventViewModel, createCalendarEventViewModel} from "./CalendarEventViewModel"
 import type {MailboxDetail} from "../mail/MailModel"
 import {UserError} from "../api/common/error/UserError"
-import {client} from "../misc/ClientDetector"
-import type {PosRect} from "../gui/base/Dropdown"
 import {showDropdown} from "../gui/base/DropdownN"
 
 export class CalendarEventPopup implements ModalComponent {
@@ -50,8 +46,9 @@ export class CalendarEventPopup implements ModalComponent {
 	view(vnode: Vnode<any>) {
 		return m(".abs.content-bg.plr.border-radius.dropdown-shadow", {
 				style: {
-					width: "400px",
+					width: px(Math.min(window.innerWidth, 400)),
 					opacity: "0", // see hack description below
+					margin: "1px" // because calendar event bubles have 1px border, we want to align
 				},
 				oncreate: ({dom}) => {
 					// This is a hack to get "natureal" view size but render it without apacity first and then show dropdown with inferred

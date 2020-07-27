@@ -85,7 +85,7 @@ export class Dialog {
 		]
 		this.view = (): VirtualElement => {
 			let marginPx = px(size.hpad)
-			const sidesMargin = styles.bodyWidth > 800 || dialogType !== DialogType.EditLarge ? marginPx : 0
+			const sidesMargin = styles.isSingleColumnLayout() && dialogType === DialogType.EditLarge ? "4px" : marginPx
 			return m(this._getDialogWrapperStyle(dialogType), {
 					style: {
 						paddingTop: requiresStatusBarHack() ? '20px' : 'env(safe-area-inset-top)'
@@ -95,7 +95,7 @@ export class Dialog {
 				m(".flex.justify-center.align-self-stretch.rel.overflow-hidden"
 					+ (dialogType === DialogType.EditLarge ? ".flex-grow" : ".transition-margin"), {  // controls horizontal alignment
 						style: {
-							'margin-top': sidesMargin,
+							marginTop: marginPx,
 							marginLeft: sidesMargin,
 							marginRight: sidesMargin,
 							'margin-bottom': (Dialog._keyboardHeight > 0)

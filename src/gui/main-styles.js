@@ -1297,14 +1297,13 @@ styles.registerStyle('main', () => {
 			'font-size': px(size.font_size_base * 1.4),
 			'line-height': `${px(size.font_size_base * 1.4 + 2)} !important`,
 		},
-
-		// media query for mobile devices, should be one pixel less than style.isDesktopLayout
 		[`@media (max-width: ${size.desktop_layout_width - 1}px)`]: {
 			'.main-view': {top: 0, bottom: 0},
 			'.logo-height': {height: px(size.header_logo_height_mobile)},
 			'.logo-height > svg': {height: px(size.header_logo_height_mobile)},
 			".fixed-bottom-right": {bottom: px(size.hpad_large_mobile + size.bottom_nav_bar), right: px(size.hpad_large_mobile)},
 			'.pt-responsive': {'padding-top': px(size.hpad_large)},
+
 
 			'.custom-logo': {width: px(40)},
 
