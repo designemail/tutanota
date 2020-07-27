@@ -7,7 +7,6 @@ import {client} from "../../misc/ClientDetector"
 import {formatDate, formatDateWithMonth, formatMonthWithFullYear, parseDate} from "../../misc/Formatter"
 import {lang} from "../../misc/LanguageViewModel"
 import {px} from "../size"
-import {Dialog} from "./Dialog"
 import {theme} from "../theme"
 import {BootIcons} from "./icons/BootIcons"
 import {neverNull} from "../../api/common/utils/Utils"
@@ -30,14 +29,12 @@ export class DatePicker implements Component {
 	input: TextField;
 	invalidDate: boolean;
 	date: Stream<?Date>;
-	_forceCompact: boolean;
 	_startOfTheWeekOffset: number;
 	_showingDropdown: boolean;
 	_disabled: boolean;
 
-	constructor(startOfTheWeekOffset: number, labelTextIdOrTextFunction: string | lazy<string>, nullSelectionTextId: TranslationKey = "emptyString_msg", forceCompact: boolean = false, disabled: boolean = false) {
+	constructor(startOfTheWeekOffset: number, labelTextIdOrTextFunction: string | lazy<string>, nullSelectionTextId: TranslationKey = "emptyString_msg", disabled: boolean = false) {
 		this.date = stream(null)
-		this._forceCompact = forceCompact
 		this._startOfTheWeekOffset = startOfTheWeekOffset
 		this._showingDropdown = false
 		this._disabled = disabled
@@ -87,6 +84,7 @@ export class DatePicker implements Component {
 	_documentClickListener: ?MouseEventListener;
 
 	view = () => {
+		const date = this.date()
 		return m(".rel", [
 			m("div", {
 				onclick: () => {
@@ -124,15 +122,19 @@ export class DatePicker implements Component {
 					startOfTheWeekOffset: this._startOfTheWeekOffset
 				}))
 				: null,
+			// For mobile devices we render a native date picker, it's easier to use and more accessible.
+			// We render invisible input which opens native picker on interaction.
 			client.isMobileDevice()
 				? m("input.fill-absolute", {
 					type: "date",
 					style: {
 						opacity: 0,
-						// This overrides platform-specific width setting
-						width: "100%",
+						// This overrides platform-specific width setting, we want to cover the whole field
+						minWidth: "100%",
 					},
-					oninput: (event) => this.setDate(new Date(event.target.valueAsDate))
+					// format as ISO date format, JS Date only supports full format.
+					value: date != null ? DateTime.fromJSDate(date).toISODate() : "",
+					oninput: (event) => this.setDate(new Date(event.target.valueAsDate)),
 				})
 				: null,
 		])

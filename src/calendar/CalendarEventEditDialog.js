@@ -66,15 +66,15 @@ export function showCalendarEventDialog(date: Date, calendars: Map<Id, CalendarI
                                         existingEvent: ?CalendarEvent, responseMail: ?Mail) {
 	const viewModel = createCalendarEventViewModel(date, calendars, mailboxDetail, existingEvent, responseMail, false)
 	const startOfTheWeekOffset = getStartOfTheWeekOffsetForUser()
-	const startDatePicker = new DatePicker(startOfTheWeekOffset, "dateFrom_label", "emptyString_msg", true, viewModel.readOnly)
-	const endDatePicker = new DatePicker(startOfTheWeekOffset, "dateTo_label", "emptyString_msg", true, viewModel.readOnly)
+	const startDatePicker = new DatePicker(startOfTheWeekOffset, "dateFrom_label", "emptyString_msg", viewModel.readOnly)
+	const endDatePicker = new DatePicker(startOfTheWeekOffset, "dateTo_label", "emptyString_msg", viewModel.readOnly)
 	startDatePicker.date.map((date) => viewModel.onStartDateSelected(date))
 	endDatePicker.date.map((date) => viewModel.onEndDateSelected(date))
 
 	const repeatValues = createRepeatValues()
 	const intervalValues = createIntevalValues()
 	const endTypeValues = createEndTypeValues()
-	const repeatEndDatePicker = new DatePicker(startOfTheWeekOffset, "emptyString_msg", "emptyString_msg", true)
+	const repeatEndDatePicker = new DatePicker(startOfTheWeekOffset, "emptyString_msg", "emptyString_msg")
 	repeatEndDatePicker.date.map((date) => viewModel.onRepeatEndDateSelected(date))
 	let finished = false
 
