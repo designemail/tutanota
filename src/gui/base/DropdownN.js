@@ -395,7 +395,7 @@ export function showDropdown(origin: PosRect, domDropdown: HTMLElement, contentH
 		maxHeight = Math.min(contentHeight, upperSpace)
 	}
 	let width = contentWidth
-	const margin = 8
+	const margin = 4
 	if (leftSpace < rightSpace) {
 		// element is in the left part of the screen, dropdown should extend to the right from the element
 		transformOrigin += " left"

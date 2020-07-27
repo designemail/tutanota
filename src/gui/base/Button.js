@@ -268,7 +268,8 @@ export function createAsyncDropDownButton(labelTextIdOrTextFunction: string | la
                                           lazyButtons: lazyAsync<$ReadOnlyArray<string | Button>>,
                                           width: number = 200, originOverride: ?(() => PosRect))
 	: Button {
-	let mainButton = new Button(labelTextIdOrTextFunction, (() => {
+	let mainButton = new Button(labelTextIdOrTextFunction, ((event) => {
+		event.stopPropagation()
 		if (!mainButton.isActive) {
 			return
 		}
@@ -315,7 +316,7 @@ export function createAsyncDropDownButton(labelTextIdOrTextFunction: string | la
 						buttonRect = initialButtonRect
 					}
 					dropdown.setOrigin(buttonRect)
-					modal.display(dropdown)
+					modal.displayUnique(dropdown, false)
 				}
 			}
 		})

@@ -131,6 +131,7 @@ export class DatePicker implements Component {
 						opacity: 0,
 						// This overrides platform-specific width setting, we want to cover the whole field
 						minWidth: "100%",
+						minHeight: "100%"
 					},
 					// format as ISO date format, JS Date only supports full format.
 					value: date != null ? DateTime.fromJSDate(date).toISODate() : "",
