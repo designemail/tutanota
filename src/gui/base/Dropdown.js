@@ -307,7 +307,6 @@ export class Dropdown {
 				                           previous + ((typeof current === "string")
 				                           ? size.button_height
 				                           : current.getHeight()), 0) + size.vpad_small * 2
-
 			showDropdown(origin, this._domDropdown, contentsHeight, this._width)
 		}
 	}

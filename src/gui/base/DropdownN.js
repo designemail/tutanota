@@ -98,6 +98,7 @@ export class DropdownN {
 		const _contents = () => {
 			return m(".dropdown-content.plr-l.scroll.abs", {
 					oncreate: (vnode) => {
+						console.log("contents created")
 						this.setContentHeight(vnode.dom)
 						this._domContents = vnode.dom
 						this._buttonsHeight = this._visibleChildren()
@@ -151,7 +152,12 @@ export class DropdownN {
 
 		this.view = (): VirtualElement => {
 			return m(".dropdown-panel.elevated-bg.border-radius.backface_fix.dropdown-shadow", {
-					oncreate: vnode => this._domDropdown = vnode.dom,
+					oncreate: vnode => {
+						console.log("panel created")
+						this._domDropdown = vnode.dom
+						// It is important to set initial opacity so that user doesn't see it with full opacity before animating.
+						vnode.dom.style.opacity = 0
+					},
 					onkeypress: e => {
 						if (this._domInput) {
 							this._domInput.focus()
@@ -430,6 +436,7 @@ export function showDropdown(origin: PosRect, domDropdown: HTMLElement, contentH
 	domDropdown.style.height = px(maxHeight)
 	domDropdown.style.transformOrigin = transformOrigin
 
+	console.log("animating")
 	return animations.add(domDropdown, [
 		opacity(0, 1, true),
 		transform("scale", 0.5, 1)
