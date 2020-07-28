@@ -131,10 +131,10 @@ interface Ospec {
 		throws: (Class<any>) => void
 	};
 
-	(string, (done: () => void, timeout: (number) => void) => mixed): void;
+	(string, (done: DoneFn, timeout: TimeoutFn) => mixed): void;
 
 	spec: (string, () => mixed) => void;
-	only: (string, () => mixed) => void;
+	only: (string, (done: DoneFn, timeout: TimeoutFn) => mixed, () => mixed) => void;
 	before: ((DoneFn, TimeoutFn) => mixed) => void;
 	after: ((DoneFn, TimeoutFn) => mixed) => void;
 	beforeEach: ((DoneFn, TimeoutFn) => mixed) => void;

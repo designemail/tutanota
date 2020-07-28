@@ -35,6 +35,7 @@ import type {CalendarGroupRoot} from "../api/entities/tutanota/CalendarGroupRoot
 import type {User} from "../api/entities/sys/User"
 import type {Group} from "../api/entities/sys/Group"
 import type {GroupMembership} from "../api/entities/sys/GroupMembership"
+import {isColorLight} from "../gui/Color"
 
 assertMainOrNode()
 
@@ -193,22 +194,10 @@ export function createRepeatRuleWithValues(frequency: RepeatPeriodEnum, interval
 	return rule
 }
 
-export function isColorLight(c: string) {
-	const rgb = parseInt(c, 16);   // convert rrggbb to decimal
-	const r = (rgb >> 16) & 0xff;  // extract red
-	const g = (rgb >> 8) & 0xff;  // extract green
-	const b = (rgb >> 0) & 0xff;  // extract blue
-
-	// Counting the perceptive luminance
-	// human eye favors green color...
-	const a = 1 - (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-	return (a < 0.5);
-}
 
 export function colorForBg(color: string): string {
 	return isColorLight(color) ? "black" : "white"
 }
-
 
 export type CalendarDay = {
 	date: Date,

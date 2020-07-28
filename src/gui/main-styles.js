@@ -8,7 +8,6 @@ import {assertMainOrNodeBoot, isAdminClient, isApp, isDesktop} from "../api/Env"
 import {theme} from "./theme.js"
 import {BrowserType} from "../misc/ClientConstants"
 import {getContentButtonIconBackground, getElevatedBackground, getNavButtonIconBackground, getNavigationMenuBg} from "./theme"
-import {hexToRgb} from "./animation/Animations"
 
 assertMainOrNodeBoot()
 
@@ -27,8 +26,7 @@ function getFonts(): string {
 	return fonts.join(', ')
 }
 
-const {r, g, b} = hexToRgb("#000000")
-const boxShadow = `0 2px 12px rgba(${r}, ${g}, ${b}, 0.4), 0 10px 40px rgba(${r}, ${g}, ${b}, 0.3)`
+const boxShadow = `0 2px 12px rgba(0, 0, 0, 0.4), 0 10px 40px rgba(0, 0, 0, 0.3)`
 
 styles.registerStyle('main', () => {
 	return {

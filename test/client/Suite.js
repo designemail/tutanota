@@ -23,6 +23,7 @@ import "./calendar/CalendarImporterTest"
 import "./support/FaqModelTest"
 import "./search/PlainTextSearchTest"
 import "./calendar/CalendarEventViewModelTest"
+import "./gui/ColorTest"
 
 import o from "ospec/ospec.js"
 

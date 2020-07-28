@@ -2,6 +2,7 @@
 import {ease} from "./Easing"
 import {assertMainOrNodeBoot} from "../../api/Env"
 import {downcast} from "../../api/common/utils/Utils"
+import {hexToRgb} from "../Color"
 
 assertMainOrNodeBoot()
 
@@ -200,28 +201,6 @@ function buildTransformString(values: TransformValues, percent: number, easing: 
 	return transform.join(' ')
 }
 
-/**
- * We use the alpha channel instead of using opacity for fading colors. Opacity changes are slow on mobile devices as they
- * effect the whole tree of the dom element with changing opacity.
- *
- * See http://stackoverflow.com/a/14677373 for a more detailed explanation.
- */
-export function hexToRgb(hexColor: string): {r: number, g: number, b: number} {
-	hexColor = hexColor.substring(1)
-	let split = hexColor.match(/.{1,2}/g)
-	if (split && split.length === 3) {
-		return {
-			r: parseInt(split[0], 16),
-			g: parseInt(split[1], 16),
-			b: parseInt(split[2], 16)
-		}
-	}
-	throw new Error("illegal color definition")
-}
-
-export function rgbToHex(color: {r: number, g: number, b: number}) {
-	return "#" + ((1 << 24) + (color.r << 16) + (color.g << 8) + color.b).toString(16).slice(1);
-}
 
 export function alpha(type: AlphaEnum, colorHex: string, begin: number, end: number): DomMutation {
 	let color = hexToRgb(colorHex)
