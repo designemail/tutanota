@@ -249,12 +249,12 @@ export class CalendarEventViewModel {
 	 * Capability for events is fairly complicated:
 	 * Note: share "shared" means "not owner of the calendar". Calendar always looks like personal for the owner.
 	 *
-	 * | Calendar | isCopy  | edit details    | own attendance | guests | organizer
-	 * |----------|---------|-----------------|----------------|--------|----------
-	 * | Personal | no      | yes             | yes            | yes    | yes
-	 * | Personal | yes     | yes (local)     | yes            | no     | no
-	 * | Shared   | no      | yes***          | no             | no*    | no*
-	 * | Shared   | yes     | yes*** (local)  | no**           | no*    | no*
+	 * | Calendar | edit details    | own attendance | guests | organizer
+	 * |----------|-----------------|----------------|--------|----------
+	 * | Personal | yes             | yes            | yes    | yes
+	 * | Personal | yes (local)     | yes            | no     | no
+	 * | Shared   | yes***          | no             | no*    | no*
+	 * | Shared   | yes*** (local)  | no**           | no*    | no*
 	 *
 	 *   * we don't allow sharing in other people's calendar because later only organizer can modify event and
 	 *   we don't want to prevent calendar owner from editing events in their own calendar.
@@ -277,7 +277,9 @@ export class CalendarEventViewModel {
 						? EventType.SHARED_RW
 						: EventType.SHARED_RO
 				} else {
-					return existingEvent.isCopy ? EventType.INVITE : EventType.OWN
+					return (existingEvent.organizer == null || this._mailAddresses.includes(existingEvent.organizer.address))
+						? EventType.OWN
+						: EventType.INVITE
 				}
 			} else {
 				// We can edit new invites (from files)
@@ -549,16 +551,7 @@ export class CalendarEventViewModel {
 
 	_viewingOwnEvent(): boolean {
 		// it is our own event if it is a new event, existing event without organizer or we are organizer
-		return (
-			!this.existingEvent
-			|| (
-				!this.existingEvent.isCopy
-				&& (
-					this.existingEvent.organizer == null ||
-					this._mailAddresses.includes(this.existingEvent.organizer.address)
-				)
-			)
-		)
+		return this._eventType === EventType.OWN
 	}
 
 	deleteEvent(): Promise<void> {
@@ -896,10 +889,14 @@ export class CalendarEventViewModel {
 		return this._inviteModel._allRecipients().concat(this._updateModel._allRecipients()).concat(this._cancelModel._allRecipients())
 	}
 
-	dispose() {
+	dispose(): void {
 		this._inviteModel.dispose()
 		this._updateModel.dispose()
 		this._cancelModel.dispose()
+	}
+
+	isInvite(): boolean {
+		return this._eventType === EventType.INVITE
 	}
 }
 

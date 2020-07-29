@@ -134,7 +134,6 @@ o.spec("CalendarEventViewModel", function () {
 			location: "location",
 			_ownerGroup: calendarGroupId,
 			organizer: mailAddress,
-			description: "descr"
 		})
 		const viewModel = init({calendars: makeCalendars("own"), existingEvent})
 
@@ -176,7 +175,6 @@ o.spec("CalendarEventViewModel", function () {
 			endTime: new Date(2020, 4, 26, 13),
 			organizer: wrapIntoMailAddress("another-user@provider.com"),
 			_ownerGroup: calendarGroupId,
-			isCopy: true,
 			attendees: [
 				createCalendarEventAttendee({
 					address: createEncryptedMailAddress({address: "attendee@example.com"})
@@ -202,7 +200,6 @@ o.spec("CalendarEventViewModel", function () {
 			endTime: new Date(2020, 4, 26, 13),
 			organizer: wrapIntoMailAddress("another-user@provider.com"),
 			_ownerGroup: null,
-			isCopy: true,
 			attendees: [
 				createCalendarEventAttendee({
 					address: mailAddress,
@@ -247,7 +244,6 @@ o.spec("CalendarEventViewModel", function () {
 			endTime: new Date(2020, 4, 26, 13),
 			organizer: wrapIntoMailAddress("another-user@provider.com"),
 			_ownerGroup: calendarGroupId,
-			isCopy: true,
 		})
 		const viewModel = init({calendars, existingEvent, userController})
 		o(viewModel.isReadOnlyEvent()).equals(false)
@@ -352,7 +348,6 @@ o.spec("CalendarEventViewModel", function () {
 				_ownerGroup: calendarGroupId,
 				organizer: wrapIntoMailAddress("another-address@example.com"),
 				attendees: [attendee],
-				isCopy: true,
 			})
 			const viewModel = init({calendars, existingEvent, calendarModel, distributor})
 			await viewModel.deleteEvent()
@@ -434,6 +429,7 @@ o.spec("CalendarEventViewModel", function () {
 			const guest = "new-attendee@example.com"
 			const existingEvent = createCalendarEvent({
 				_id: ["listId", "eventId"],
+				_ownerGroup: calendarGroupId,
 				attendees: [
 					createCalendarEventAttendee({
 						address: createEncryptedMailAddress({address: guest})
@@ -473,6 +469,7 @@ o.spec("CalendarEventViewModel", function () {
 			})
 			const existingEvent = createCalendarEvent({
 				_id: ["listId", "eventId"],
+				_ownerGroup: calendarGroupId,
 				attendees: [
 					createCalendarEventAttendee({
 						address: createEncryptedMailAddress({address: oldGuest})
@@ -589,6 +586,7 @@ o.spec("CalendarEventViewModel", function () {
 			})
 			const existingEvent = createCalendarEvent({
 				_id: ["listId", "eventId"],
+				_ownerGroup: calendarGroupId,
 				attendees: [
 					createCalendarEventAttendee({
 						address: createEncryptedMailAddress({address: oldGuest})
@@ -630,6 +628,7 @@ o.spec("CalendarEventViewModel", function () {
 			})
 			const existingEvent = createCalendarEvent({
 				_id: ["listId", "eventId"],
+				_ownerGroup: calendarGroupId,
 				attendees: [
 					toRemoveAttendee
 				],
@@ -669,7 +668,6 @@ o.spec("CalendarEventViewModel", function () {
 				endTime: new Date(2020, 5, 2),
 				organizer: wrapIntoMailAddress(organizerAddress),
 				attendees: [ownAttendee, anotherAttendee],
-				isCopy: true,
 			})
 			const viewModel = init({calendars, existingEvent, calendarModel, distributor, mail})
 			viewModel.selectGoing(CalendarAttendeeStatus.ACCEPTED)
@@ -682,7 +680,6 @@ o.spec("CalendarEventViewModel", function () {
 				a.address.address === ownAttendee.address.address).status).equals(CalendarAttendeeStatus.ACCEPTED)
 			o(createdEvent.attendees.find(a =>
 				a.address.address === anotherAttendee.address.address).status).equals(CalendarAttendeeStatus.DECLINED)
-			o(createdEvent.isCopy).equals(true)
 
 			o(distributor.sendUpdate.calls).deepEquals([])
 			o(distributor.sendInvite.calls).deepEquals([])
@@ -743,6 +740,7 @@ o.spec("CalendarEventViewModel", function () {
 			const alias = "alias@tutanota.com"
 			const userController = makeUserController([alias])
 			const existingEvent = createCalendarEvent({
+				_ownerGroup: calendarGroupId,
 				startTime: new Date(2020, 5, 1),
 				endTime: new Date(2020, 5, 2),
 				organizer: wrapIntoMailAddress(alias),
@@ -751,7 +749,7 @@ o.spec("CalendarEventViewModel", function () {
 			const viewModel = init({calendars, distributor, userController, existingEvent})
 			const askForUpdates = o.spy(() => Promise.resolve(true))
 
-			const result = await viewModel.saveAndSend({askForUpdates, askInsecurePassword, showProgress})
+			await viewModel.saveAndSend({askForUpdates, askInsecurePassword, showProgress})
 
 			o(distributor.sendUpdate.calls[0].args[1]).equals(updateModel)
 			o(updateModel._bccRecipients.map(getAddress)).deepEquals([anotherAttendee.address.address])
@@ -768,6 +766,7 @@ o.spec("CalendarEventViewModel", function () {
 			const alias = "alias@tutanota.com"
 			const userController = makeUserController([alias])
 			const existingEvent = createCalendarEvent({
+				_ownerGroup: calendarGroupId,
 				startTime: new Date(2020, 5, 1),
 				endTime: new Date(2020, 5, 2),
 				organizer: wrapIntoMailAddress(alias),
@@ -777,7 +776,7 @@ o.spec("CalendarEventViewModel", function () {
 			askForUpdates = o.spy(() => Promise.resolve(true))
 
 			viewModel.addAttendee(mailAddress.address)
-			const result = await viewModel.saveAndSend({askForUpdates, askInsecurePassword, showProgress})
+			await viewModel.saveAndSend({askForUpdates, askInsecurePassword, showProgress})
 
 			o(distributor.sendUpdate.calls[0].args[1]).equals(updateModel)
 			o(updateModel._bccRecipients.map(getAddress)).deepEquals([anotherAttendee.address.address])
@@ -1027,7 +1026,6 @@ o.spec("CalendarEventViewModel", function () {
 			const existingEvent = createCalendarEvent({
 				attendees: [attendee, ownAttendee],
 				organizer: createEncryptedMailAddress({address: "organizer@example.com"}),
-				isCopy: true,
 			})
 			const viewModel = init({calendars, existingEvent})
 
@@ -1163,7 +1161,7 @@ o.spec("CalendarEventViewModel", function () {
 				existingEvent: createCalendarEvent({
 					_id: ["listId", "calendarId"],
 					_ownerGroup: calendarGroupId,
-					isCopy: true,
+					organizer: createEncryptedMailAddress({address: "organizer@example.com"})
 				})
 			})
 

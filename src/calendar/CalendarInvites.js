@@ -69,13 +69,10 @@ export function getLatestEvent(event: CalendarEvent): Promise<CalendarEvent> {
 				// It should be the latest version eventually via CalendarEventUpdates
 				return existingEvent
 			} else {
-				// Set isCopy here to show that this is not created by us
-				event.isCopy = true
 				return event
 			}
 		})
 	} else {
-		event.isCopy = true
 		return Promise.resolve(event)
 	}
 }

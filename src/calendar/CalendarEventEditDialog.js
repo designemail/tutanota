@@ -328,7 +328,7 @@ export function showCalendarEventDialog(date: Date, calendars: Map<Id, CalendarI
 	)
 
 	function renderChangesMessage() {
-		return viewModel.existingEvent && viewModel.existingEvent.isCopy
+		return viewModel.isInvite()
 			? m(".mt.mb-s", lang.get("eventCopy_msg"))
 			: null
 	}
