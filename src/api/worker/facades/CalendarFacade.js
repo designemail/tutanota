@@ -245,17 +245,18 @@ export class CalendarFacade {
 		}
 	}
 
+	/**
+	 * Queries the event using the uid index. The index is stored per calendar so we have to go through all calendars to find matching event.
+	 * We currently only need this for calendar event updates and for that we don't want to look into shared calendars.
+	 */
 	getEventByUid(uid: string): Promise<?CalendarEvent> {
-
-		const calendarMemberships = this._loginFacade.getLoggedInUser().memberships.filter(m => m.groupType === GroupType.Calendar)
+		const calendarMemberships = this._loginFacade.getLoggedInUser().memberships
+		                                .filter(m => m.groupType === GroupType.Calendar && m.capability == null)
 		return Promise
 			.reduce(calendarMemberships, (acc, membership) => {
 				// short-circuit if we've already found the event
 				if (acc) {
 					return acc
-				}
-				if (membership.capability != null) {
-					return Promise.resolve(null) // do not search in the shared groups
 				}
 				return load(CalendarGroupRootTypeRef, membership.group)
 					.then((groupRoot) =>

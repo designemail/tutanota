@@ -51,7 +51,7 @@ export class CalendarEventPopup implements ModalComponent {
 					margin: "1px" // because calendar event bubles have 1px border, we want to align
 				},
 				oncreate: ({dom}) => {
-					// This is a hack to get "natureal" view size but render it without apacity first and then show dropdown with inferred
+					// This is a hack to get "natural" view size but render it without apacity first and then show dropdown with inferred
 					// size.
 					setTimeout(() => showDropdown(this._rect, dom, dom.offsetHeight, 400), 24)
 				},
@@ -114,44 +114,6 @@ export class CalendarEventPopup implements ModalComponent {
 	popState(e: Event): boolean {
 		return true
 	}
-}
-
-function showMobileDialog(viewModel: CalendarEventViewModel, event: CalendarEvent, onEditEvent: () => mixed) {
-	const dialog = Dialog.largeDialog({
-		left: [
-			{
-				label: "close_alt",
-				click: () => dialog.close(),
-				type: ButtonType.ActionLarge,
-				icon: () => Icons.Cancel,
-				colors: ButtonColors.DrawerNav,
-			},
-		],
-		right: [
-			{
-				label: "edit_action",
-				click: () => {
-					onEditEvent()
-					dialog.close()
-				},
-				type: ButtonType.ActionLarge,
-				icon: () => Icons.Edit,
-				colors: ButtonColors.DrawerNav,
-			}
-		].concat(!viewModel.isReadOnlyEvent() ? {
-				label: "delete_action",
-				click: () => deleteEvent(viewModel).then((confirmed) => {
-					if (confirmed) dialog.close()
-				}),
-				type: ButtonType.ActionLarge,
-				icon: () => Icons.Trash,
-				colors: ButtonColors.DrawerNav,
-			}
-			: []
-		)
-	}, {
-		view: () => m(".mt.pl-s.pr-s", m(EventPreviewView, {event, limitDescriptionHeight: false}))
-	}).show()
 }
 
 function deleteEvent(viewModel: CalendarEventViewModel): Promise<boolean> {

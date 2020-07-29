@@ -340,9 +340,8 @@ export class WorkerImpl {
 		})
 
 		Promise.onPossiblyUnhandledRejection(e => {
-			console.log("error on the worker", e)
 			this.sendError(e)
-		});
+		})
 
 		if (workerScope) {
 			workerScope.onerror = (e: string | Event, source, lineno, colno, error) => {

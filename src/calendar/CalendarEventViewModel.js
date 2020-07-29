@@ -40,7 +40,6 @@ import {
 import {assertNotNull, clone, downcast, neverNull, noOp} from "../api/common/utils/Utils"
 import {generateEventElementId, isAllDayEvent} from "../api/common/utils/CommonCalendarUtils"
 import {calendarModel, CalendarModel, incrementByRepeatPeriod} from "./CalendarModel"
-import m from "mithril"
 import {DateTime} from "luxon"
 import type {EncryptedMailAddress} from "../api/entities/tutanota/EncryptedMailAddress"
 import {createEncryptedMailAddress} from "../api/entities/tutanota/EncryptedMailAddress"
@@ -172,14 +171,14 @@ export class CalendarEventViewModel {
 		this.alarms = []
 		this._user = userController.user
 
-		this._guestStatuses = this.initGuestStatus(existingEvent, resolveRecipientsLazily)
-		this.attendees = this.initAttendees()
+		this._guestStatuses = this._initGuestStatus(existingEvent, resolveRecipientsLazily)
+		this.attendees = this._initAttendees()
 		if (existingEvent) {
 			if (existingEvent.invitedConfidentially != null) {
 				this.setConfidential(existingEvent.invitedConfidentially)
 			}
 		}
-		this._eventType = this.initEventType(existingEvent, calendars)
+		this._eventType = this._initEventType(existingEvent, calendars)
 
 		this.possibleOrganizers = existingOrganizer && !this.canModifyOrganizer()
 			? [existingOrganizer]
@@ -191,7 +190,7 @@ export class CalendarEventViewModel {
 		this.selectedCalendar = stream(this.getAvailableCalendars()[0])
 
 		if (existingEvent) {
-			this.applyValuesFromExistingEvent(existingEvent, calendars)
+			this._applyValuesFromExistingEvent(existingEvent, calendars)
 		} else {
 			// We care about passed time here, use it for default time values.
 			this._setDefaultTimes(date)
@@ -201,7 +200,7 @@ export class CalendarEventViewModel {
 
 	}
 
-	applyValuesFromExistingEvent(existingEvent: CalendarEvent, calendars: Map<Id, CalendarInfo>): void {
+	_applyValuesFromExistingEvent(existingEvent: CalendarEvent, calendars: Map<Id, CalendarInfo>): void {
 		this.summary(existingEvent.summary)
 		const calendarForGroup = calendars.get(neverNull(existingEvent._ownerGroup))
 		if (calendarForGroup) {
@@ -266,7 +265,7 @@ export class CalendarEventViewModel {
 	 *
 	 *   *** depends on share capability. Cannot edit if it's not a copy and there are attendees.
 	 */
-	initEventType(existingEvent: ?CalendarEvent, calendars: Map<Id, CalendarInfo>): EventTypeEnum {
+	_initEventType(existingEvent: ?CalendarEvent, calendars: Map<Id, CalendarInfo>): EventTypeEnum {
 		if (!existingEvent) {
 			return EventType.OWN
 		} else {
@@ -287,7 +286,7 @@ export class CalendarEventViewModel {
 		}
 	}
 
-	initGuestStatus(existingEvent: ?CalendarEvent, resolveRecipientsLazily: boolean): Stream<$ReadOnlyMap<string, CalendarAttendeeStatusEnum>> {
+	_initGuestStatus(existingEvent: ?CalendarEvent, resolveRecipientsLazily: boolean): Stream<$ReadOnlyMap<string, CalendarAttendeeStatusEnum>> {
 		const newStatuses = new Map()
 		if (existingEvent) {
 			existingEvent.attendees.forEach((attendee) => {
@@ -305,7 +304,7 @@ export class CalendarEventViewModel {
 		return stream(newStatuses)
 	}
 
-	initAttendees(): Stream<Array<Guest>> {
+	_initAttendees(): Stream<Array<Guest>> {
 		return stream.merge(
 			[this._inviteModel.recipientsChanged, this._updateModel.recipientsChanged, this._guestStatuses, this._ownAttendee]
 		).map(() => {
@@ -549,6 +548,7 @@ export class CalendarEventViewModel {
 	}
 
 	_viewingOwnEvent(): boolean {
+		// it is our own event if it is a new event, existing event without organizer or we are organizer
 		return (
 			!this.existingEvent
 			|| (
@@ -603,7 +603,6 @@ export class CalendarEventViewModel {
 			showProgress: (Promise<mixed> => mixed),
 		}
 	): Promise<EventCreateResult> {
-		console.log("saveAndSend", this._processing)
 		if (this._processing) {
 			return Promise.resolve(false)
 		}
@@ -671,6 +670,7 @@ export class CalendarEventViewModel {
 			newEvent.organizer = this.organizer
 
 			if (this._viewingOwnEvent()) {
+				// if it is our own event we need to collect email addresses of attendees to send update notification.
 				if (existingEvent) {
 					this.attendees().forEach((guest) => {
 						if (this._mailAddresses.includes(guest.address.address)) {

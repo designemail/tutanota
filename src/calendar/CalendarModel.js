@@ -622,7 +622,7 @@ export class CalendarModelImpl implements CalendarModel {
 		if (ids.length === 0) {
 			return Promise.resolve([])
 		}
-		return loadMultipleList(this._worker, UserAlarmInfoTypeRef, listIdPart(ids[0]), ids.map(elementIdPart))
+		return loadMultipleList(UserAlarmInfoTypeRef, listIdPart(ids[0]), ids.map(elementIdPart), this._worker)
 	}
 
 	_scheduleNotification(identifier: string, event: CalendarEvent, time: Date) {

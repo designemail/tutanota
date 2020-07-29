@@ -391,7 +391,6 @@ export function showCalendarEventDialog(date: Date, calendars: Map<Id, CalendarI
 	}
 
 	function finish() {
-		console.log("finished")
 		finished = true
 		viewModel.dispose()
 		dialog.close()

@@ -66,7 +66,7 @@ export function loadMultiple<T: SomeEntity>(typeRef: TypeRef<T>, listId: ?Id, el
 /**
  * load multiple does not guarantee order or completeness of returned elements.
  */
-export function loadMultipleList<T: ListElement>(restInterface: EntityRestInterface, typeRef: TypeRef<T>, listId: Id, elementIds: Id[]
+export function loadMultipleList<T: ListElement>(typeRef: TypeRef<T>, listId: Id, elementIds: Id[], restInterface: EntityRestInterface
 ): Promise<T[]> {
 	return _loadMultipleEntities(typeRef, listId, elementIds, restInterface)
 }
