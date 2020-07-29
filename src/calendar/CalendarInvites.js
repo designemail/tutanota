@@ -95,14 +95,26 @@ export function replyToEventInvitation(
 		loadOrCreateCalendarInfo(),
 		locator.mailModel.getMailboxDetailsForMail(previousMail)
 	]).then(([calendars, mailboxDetails]) => {
-		const calendar = logins.isInternalUserLoggedIn() ? firstThrow(Array.from(calendars.values())) : null
+		const calendar: ?CalendarInfo = logins.isInternalUserLoggedIn() ? firstThrow(Array.from(calendars.values())) : null
 		const sendMailModel = new SendMailModel(logins, locator.mailModel, locator.contactModel, locator.eventController, mailboxDetails)
-		return calendarUpdateDistributor.sendResponse(eventClone, sendMailModel, foundAttendee.address.address, previousMail, decision)
-		                                .catch(UserError, (e) => Dialog.error(() => e.message))
-		                                .then(() => {
-			                                if (calendar) {
-				                                calendarModel.createEvent(eventClone, [], getTimeZone(), calendar.groupRoot)
-			                                }
-		                                })
+		return calendarUpdateDistributor
+			.sendResponse(eventClone, sendMailModel, foundAttendee.address.address, previousMail, decision)
+			.catch(UserError, (e) => Dialog.error(() => e.message))
+			.then(() => {
+				if (calendar) {
+					if (event._ownerGroup) {
+						return calendarModel.loadAlarms(event.alarmInfos, logins.getUserController().user)
+						                    .then((alarms) => {
+								                    const alarmInfos = alarms.map((a) => a.alarmInfo)
+								                    return calendarModel.updateEvent(eventClone, alarmInfos, getTimeZone(), calendar.groupRoot, event)
+							                    }
+						                    )
+					} else {
+						return calendarModel.createEvent(eventClone, [], getTimeZone(), calendar.groupRoot)
+					}
+				} else {
+					return Promise.resolve()
+				}
+			})
 	})
 }

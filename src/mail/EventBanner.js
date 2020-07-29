@@ -38,13 +38,13 @@ export class EventBanner implements MComponent<Attrs> {
 					paddingTop: "0",
 				}
 			}, [
-				m(".mt"),
-				// Separate element instead of padding on a parent so that the banner can collapse in height
-				m("", method === CalendarMethod.REQUEST
+				m("", method === CalendarMethod.REQUEST && ownAttendee
 					? mail.replyType === ReplyType.REPLY || (ownAttendee && ownAttendee.status !== CalendarAttendeeStatus.NEEDS_ACTION)
-						? m(".align-self-start.start.smaller", lang.get("alreadyReplied_msg", ))
+						? m(".pt.align-self-start.start.smaller", lang.get("alreadyReplied_msg"))
 						: renderReplyButtons(event, mail, recipient)
-					: null),
+					: method === CalendarMethod.REPLY
+						? m(".pt.align-self-start.start.smaller", lang.get("eventNotificationUpdated_msg"))
+						: null),
 				m(".ml-negative-s.limit-width.align-self-start", m(ButtonN, {
 					label: "viewEvent_action",
 					type: ButtonType.Secondary,
@@ -57,7 +57,7 @@ export class EventBanner implements MComponent<Attrs> {
 
 function renderReplyButtons(event: CalendarEvent, previousMail: Mail, recipient: string) {
 	return [
-		m("", lang.get("invitedToEvent_msg")),
+		m(".pt", lang.get("invitedToEvent_msg")),
 		m(".flex.items-center.mt", [
 			m(BannerButton, {
 				text: lang.get("yes_label"),

@@ -145,7 +145,7 @@ o.spec("CalendarEventViewModel", function () {
 		o(viewModel.endTime).equals("13:00")
 		o(viewModel.note).equals(existingEvent.description)
 		o(viewModel.location()).equals(existingEvent.location)
-		o(viewModel.readOnly).equals(false)
+		o(viewModel.isReadOnlyEvent()).equals(false)
 		o(viewModel.canModifyGuests()).equals(true)("canModifyGuests")
 		o(viewModel.canModifyOwnAttendance()).equals(true)
 		o(viewModel.canModifyOrganizer()).equals(true)
@@ -187,7 +187,7 @@ o.spec("CalendarEventViewModel", function () {
 			]
 		})
 		const viewModel = init({calendars: makeCalendars("own"), existingEvent})
-		o(viewModel.readOnly).equals(false)
+		o(viewModel.isReadOnlyEvent()).equals(false)
 		o(viewModel.canModifyGuests()).equals(false)
 		o(viewModel.canModifyOwnAttendance()).equals(true)
 		o(viewModel.canModifyOrganizer()).equals(false)
@@ -211,7 +211,7 @@ o.spec("CalendarEventViewModel", function () {
 			]
 		})
 		const viewModel = init({calendars, existingEvent})
-		o(viewModel.readOnly).equals(false)
+		o(viewModel.isReadOnlyEvent()).equals(false)
 		o(viewModel.canModifyGuests()).equals(false)
 		o(viewModel.canModifyOwnAttendance()).equals(true)
 		o(viewModel.canModifyOrganizer()).equals(false)
@@ -230,7 +230,7 @@ o.spec("CalendarEventViewModel", function () {
 			_ownerGroup: calendarGroupId,
 		})
 		const viewModel = init({calendars, existingEvent, userController})
-		o(viewModel.readOnly).equals(false)
+		o(viewModel.isReadOnlyEvent()).equals(false)
 		o(viewModel.canModifyGuests()).equals(false)
 		o(viewModel.canModifyOwnAttendance()).equals(false)
 		o(viewModel.canModifyOrganizer()).equals(false)
@@ -250,7 +250,7 @@ o.spec("CalendarEventViewModel", function () {
 			isCopy: true,
 		})
 		const viewModel = init({calendars, existingEvent, userController})
-		o(viewModel.readOnly).equals(false)
+		o(viewModel.isReadOnlyEvent()).equals(false)
 		o(viewModel.canModifyGuests()).equals(false)
 		o(viewModel.canModifyOwnAttendance()).equals(false)
 		o(viewModel.canModifyOrganizer()).equals(false)
@@ -266,7 +266,7 @@ o.spec("CalendarEventViewModel", function () {
 		})
 		const viewModel = init({calendars, existingEvent, userController})
 
-		o(viewModel.readOnly).equals(true)
+		o(viewModel.isReadOnlyEvent()).equals(true)
 		o(viewModel.canModifyGuests()).equals(false)("canModifyGuests")
 		o(viewModel.canModifyOwnAttendance()).equals(false)
 		o(viewModel.canModifyOrganizer()).equals(false)
@@ -289,7 +289,7 @@ o.spec("CalendarEventViewModel", function () {
 			]
 		})
 		const viewModel = init({calendars, userController, existingEvent})
-		o(viewModel.readOnly).equals(true)
+		o(viewModel.isReadOnlyEvent()).equals(true)
 		o(viewModel.canModifyGuests()).equals(false)
 		o(viewModel.canModifyOwnAttendance()).equals(false)
 		o(viewModel.canModifyOrganizer()).equals(false)
@@ -815,6 +815,7 @@ o.spec("CalendarEventViewModel", function () {
 				organizer: wrapIntoMailAddress("organizer@tutanota.de"),
 				startTime: DateTime.utc(2020, 6, 11).toJSDate(),
 				endTime: DateTime.utc(2020, 7, 12).toJSDate(),
+				_ownerGroup: calendarGroupId,
 				attendees: [
 					createCalendarEventAttendee({
 						address: createEncryptedMailAddress({address: "guest@tutanota.com"})
@@ -859,6 +860,53 @@ o.spec("CalendarEventViewModel", function () {
 			// No hours because it's a "date", not "time" field.
 			o(viewModel.endDate.toISOString())
 				.equals(DateTime.fromObject({year: 2020, month: 6, day: 7, zone}).toJSDate().toISOString())
+			o(viewModel.endTime).equals("15:00")
+		})
+	})
+
+	o.spec("onStartTimeSelected", function () {
+		o("time adjusted forward", async function () {
+			const calendars = makeCalendars("own")
+			const existingEvent = createCalendarEvent({
+				startTime: DateTime.fromObject({year: 2020, month: 6, day: 8, hour: 13, zone}).toJSDate(),
+				endTime: DateTime.fromObject({year: 2020, month: 6, day: 8, hour: 15, zone}).toJSDate(),
+			})
+			const viewModel = init({calendars, existingEvent})
+			viewModel.onStartTimeSelected("14:00")
+
+			// No hours because it's a "date", not "time" field.
+			o(viewModel.endDate.toISOString())
+				.equals(DateTime.fromObject({year: 2020, month: 6, day: 8, zone}).toJSDate().toISOString())
+			o(viewModel.endTime).equals("16:00")
+		})
+
+		o("time adjusted backward", async function () {
+			const calendars = makeCalendars("own")
+			const existingEvent = createCalendarEvent({
+				startTime: DateTime.fromObject({year: 2020, month: 6, day: 8, hour: 13, zone}).toJSDate(),
+				endTime: DateTime.fromObject({year: 2020, month: 6, day: 8, hour: 15, zone}).toJSDate(),
+			})
+			const viewModel = init({calendars, existingEvent})
+			viewModel.onStartTimeSelected("12:00")
+
+			// No hours because it's a "date", not "time" field.
+			o(viewModel.endDate.toISOString())
+				.equals(DateTime.fromObject({year: 2020, month: 6, day: 8, zone}).toJSDate().toISOString())
+			o(viewModel.endTime).equals("14:00")
+		})
+
+		o("time not adjust when different day", async function () {
+			const calendars = makeCalendars("own")
+			const existingEvent = createCalendarEvent({
+				startTime: DateTime.fromObject({year: 2020, month: 6, day: 8, hour: 13, zone}).toJSDate(),
+				endTime: DateTime.fromObject({year: 2020, month: 6, day: 9, hour: 15, zone}).toJSDate(),
+			})
+			const viewModel = init({calendars, existingEvent})
+			viewModel.onStartTimeSelected("12:00")
+
+			// No hours because it's a "date", not "time" field.
+			o(viewModel.endDate.toISOString())
+				.equals(DateTime.fromObject({year: 2020, month: 6, day: 9, zone}).toJSDate().toISOString())
 			o(viewModel.endTime).equals("15:00")
 		})
 	})
@@ -1133,6 +1181,7 @@ function makeCalendars(type: "own" | "shared"): Map<string, CalendarInfo> {
 		group: createGroup({
 			_id: calendarGroupId,
 			type: GroupType.Calendar,
+			user: type === "own" ? userId : "anotherUserId",
 		}),
 		shared: type === "shared"
 	}

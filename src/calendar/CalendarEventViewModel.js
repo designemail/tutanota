@@ -26,7 +26,7 @@ import {
 	getAllDayDateUTCFromZone,
 	getDiffInDays,
 	getEventEnd,
-	getEventStart,
+	getEventStart, getNextHalfHour,
 	getStartOfDayWithZone,
 	getStartOfNextDayWithZone,
 	getTimeZone,
@@ -92,16 +92,19 @@ type RepeatData = {|
 	endValue: number
 |}
 
+/**
+ * ViewModel for viewing/editing the event. Takes care of sending out updates.
+ */
 export class CalendarEventViewModel {
 	+summary: Stream<string>;
-	+calendars: Array<CalendarInfo>;
-	+selectedCalendar: Stream<CalendarInfo>;
+	+selectedCalendar: Stream<?CalendarInfo>;
 	startDate: Date;
 	endDate: Date;
 	startTime: string;
 	endTime: string;
 	+allDay: Stream<boolean>;
 	repeat: ?RepeatData
+	calendars: Array<CalendarInfo>
 	+attendees: Stream<$ReadOnlyArray<Guest>>;
 	organizer: ?EncryptedMailAddress;
 	+possibleOrganizers: $ReadOnlyArray<EncryptedMailAddress>;
@@ -110,7 +113,6 @@ export class CalendarEventViewModel {
 	+amPmFormat: boolean;
 	+existingEvent: ?CalendarEvent
 	_oldStartTime: ?string;
-	+readOnly: boolean;
 	+_zone: string;
 	// We keep alarms read-only so that view can diff just array and not all elements
 	alarms: $ReadOnlyArray<AlarmInfo>;
@@ -151,19 +153,160 @@ export class CalendarEventViewModel {
 		this._updateModel = sendMailModelFactory(mailboxDetail, "update")
 		this._cancelModel = sendMailModelFactory(mailboxDetail, "cancel")
 		this.summary = stream("")
-		this.calendars = Array.from(calendars.values())
-		this.selectedCalendar = stream(this.calendars[0])
-		if ((existingEvent && (existingEvent.invitedConfidentially != null))) {
-			this.setConfidential(existingEvent.invitedConfidentially)
-		}
-		this._guestStatuses = stream(new Map())
 		this._sendModelFactory = () => sendMailModelFactory(mailboxDetail, "response")
 		this._mailAddresses = getEnabledMailAddressesWithUser(mailboxDetail, userController.userGroupInfo)
 		this._ownAttendee = stream(null)
 		this.sendingOutUpdate = stream(false)
 		this._processing = false
 
-		this.attendees = stream.merge(
+		const existingOrganizer = existingEvent && existingEvent.organizer
+		this.organizer = existingOrganizer
+			? copyMailAddress(existingOrganizer)
+			: addressToMailAddress(getDefaultSenderFromUser(userController), mailboxDetail, userController)
+		this.location = stream("")
+		this.note = ""
+		this.allDay = stream(false)
+		this.amPmFormat = userController.userSettingsGroupRoot.timeFormat === TimeFormat.TWELVE_HOURS
+		this.existingEvent = existingEvent
+		this._zone = zone
+		this.alarms = []
+		this._user = userController.user
+
+		this._guestStatuses = this.initGuestStatus(existingEvent, resolveRecipientsLazily)
+		this.attendees = this.initAttendees()
+		if (existingEvent) {
+			if (existingEvent.invitedConfidentially != null) {
+				this.setConfidential(existingEvent.invitedConfidentially)
+			}
+		}
+		this._eventType = this.initEventType(existingEvent, calendars)
+
+		this.possibleOrganizers = existingOrganizer && !this.canModifyOrganizer()
+			? [existingOrganizer]
+			: existingOrganizer && !this._mailAddresses.includes(existingOrganizer.address)
+				? [existingOrganizer].concat(this._ownPossibleOrganizers(mailboxDetail, userController))
+				: this._ownPossibleOrganizers(mailboxDetail, userController)
+
+		this.calendars = Array.from(calendars.values())
+		this.selectedCalendar = stream(this.getAvailableCalendars()[0])
+
+		if (existingEvent) {
+			this.applyValuesFromExistingEvent(existingEvent, calendars)
+		} else {
+			// We care about passed time here, use it for default time values.
+			this._setDefaultTimes(date)
+			this.startDate = getStartOfDayWithZone(date, this._zone)
+			this.endDate = getStartOfDayWithZone(date, this._zone)
+		}
+
+	}
+
+	applyValuesFromExistingEvent(existingEvent: CalendarEvent, calendars: Map<Id, CalendarInfo>): void {
+		this.summary(existingEvent.summary)
+		const calendarForGroup = calendars.get(neverNull(existingEvent._ownerGroup))
+		if (calendarForGroup) {
+			this.selectedCalendar(calendarForGroup)
+		}
+		this.allDay(isAllDayEvent(existingEvent))
+		this.startDate = getStartOfDayWithZone(getEventStart(existingEvent, this._zone), this._zone)
+		if (this.allDay()) {
+			this.endDate = incrementDate(getEventEnd(existingEvent, this._zone), -1)
+			// We don't care about passed time here, just use current one as default
+			this._setDefaultTimes()
+		} else {
+			this.startTime = timeStringInZone(getEventStart(existingEvent, this._zone), this.amPmFormat, this._zone)
+			this.endTime = timeStringInZone(getEventEnd(existingEvent, this._zone), this.amPmFormat, this._zone)
+			this.endDate = getStartOfDayWithZone(getEventEnd(existingEvent, this._zone), this._zone)
+		}
+
+		if (existingEvent.repeatRule) {
+			const existingRule = existingEvent.repeatRule
+			const repeat = {
+				frequency: downcast(existingRule.frequency),
+				interval: Number(existingRule.interval),
+				endType: downcast(existingRule.endType),
+				endValue: existingRule.endType === EndType.Count ? Number(existingRule.endValue) : 1,
+			}
+			if (existingRule.endType === EndType.UntilDate) {
+				const rawEndDate = new Date(Number(existingRule.endValue))
+				const localDate = this.allDay() ? getAllDayDateForTimezone(rawEndDate, this._zone) : rawEndDate
+				// Shown date is one day behind the actual end (for us it's excluded)
+				const shownDate = incrementByRepeatPeriod(localDate, RepeatPeriod.DAILY, -1, this._zone)
+				repeat.endValue = shownDate.getTime()
+			}
+			this.repeat = repeat
+		} else {
+			this.repeat = null
+		}
+		this.location(existingEvent.location)
+		this.note = existingEvent.description
+
+		this._calendarModel.loadAlarms(existingEvent.alarmInfos, this._user).then((alarms) => {
+			alarms.forEach((alarm) => this.addAlarm(downcast(alarm.alarmInfo.trigger)))
+		})
+	}
+
+	/**
+	 * Capability for events is fairly complicated:
+	 * Note: share "shared" means "not owner of the calendar". Calendar always looks like personal for the owner.
+	 *
+	 * | Calendar | isCopy  | edit details    | own attendance | guests | organizer
+	 * |----------|---------|-----------------|----------------|--------|----------
+	 * | Personal | no      | yes             | yes            | yes    | yes
+	 * | Personal | yes     | yes (local)     | yes            | no     | no
+	 * | Shared   | no      | yes***          | no             | no*    | no*
+	 * | Shared   | yes     | yes*** (local)  | no**           | no*    | no*
+	 *
+	 *   * we don't allow sharing in other people's calendar because later only organizer can modify event and
+	 *   we don't want to prevent calendar owner from editing events in their own calendar.
+	 *
+	 *   ** this is not "our" copy of the event, from the point of organizer we saw it just accidentally.
+	 *   Later we might support proposing ourselves as attendee but currently organizer should be asked to
+	 *   send out the event.
+	 *
+	 *   *** depends on share capability. Cannot edit if it's not a copy and there are attendees.
+	 */
+	initEventType(existingEvent: ?CalendarEvent, calendars: Map<Id, CalendarInfo>): EventTypeEnum {
+		if (!existingEvent) {
+			return EventType.OWN
+		} else {
+			// OwnerGroup is not set for events from file
+			const calendarInfoForEvent = existingEvent._ownerGroup && calendars.get(existingEvent._ownerGroup)
+			if (calendarInfoForEvent) {
+				if (calendarInfoForEvent.shared) {
+					return hasCapabilityOnGroup(this._user, calendarInfoForEvent.group, ShareCapability.Write)
+						? EventType.SHARED_RW
+						: EventType.SHARED_RO
+				} else {
+					return existingEvent.isCopy ? EventType.INVITE : EventType.OWN
+				}
+			} else {
+				// We can edit new invites (from files)
+				return EventType.INVITE
+			}
+		}
+	}
+
+	initGuestStatus(existingEvent: ?CalendarEvent, resolveRecipientsLazily: boolean): Stream<$ReadOnlyMap<string, CalendarAttendeeStatusEnum>> {
+		const newStatuses = new Map()
+		if (existingEvent) {
+			existingEvent.attendees.forEach((attendee) => {
+				if (this._mailAddresses.includes(attendee.address.address)) {
+					this._ownAttendee(copyMailAddress(attendee.address))
+				} else {
+					this._updateModel.addRecipient("bcc", {
+						name: attendee.address.name,
+						address: attendee.address.address,
+					}, resolveRecipientsLazily)
+				}
+				newStatuses.set(attendee.address.address, getAttendeeStatus(attendee))
+			})
+		}
+		return stream(newStatuses)
+	}
+
+	initAttendees(): Stream<Array<Guest>> {
+		return stream.merge(
 			[this._inviteModel.recipientsChanged, this._updateModel.recipientsChanged, this._guestStatuses, this._ownAttendee]
 		).map(() => {
 			const guests = this._inviteModel._bccRecipients.concat(this._updateModel._bccRecipients)
@@ -192,137 +335,9 @@ export class CalendarEventViewModel {
 			}
 			return guests
 		})
-
-		if (existingEvent) {
-			const newStatuses = new Map()
-			existingEvent.attendees.forEach((attendee) => {
-				if (this._mailAddresses.includes(attendee.address.address)) {
-					this._ownAttendee(copyMailAddress(attendee.address))
-				} else {
-					this._updateModel.addRecipient("bcc", {
-						name: attendee.address.name,
-						address: attendee.address.address,
-					}, resolveRecipientsLazily)
-				}
-				newStatuses.set(attendee.address.address, getAttendeeStatus(attendee))
-			})
-			this._guestStatuses(newStatuses)
-		}
-		const existingOrganizer = existingEvent && existingEvent.organizer
-		this.organizer = existingOrganizer
-			? copyMailAddress(existingOrganizer)
-			: addressToMailAddress(getDefaultSenderFromUser(userController), mailboxDetail, userController)
-		this.location = stream("")
-		this.note = ""
-		this.allDay = stream(true)
-		this.amPmFormat = userController.userSettingsGroupRoot.timeFormat === TimeFormat.TWELVE_HOURS
-		this.existingEvent = existingEvent
-		this._zone = zone
-		this.alarms = []
-		this._user = userController.user
-
-		/**
-		 * Capability for events is fairly complicated:
-		 * Note: share "shared" means "not owner of the calendar". Calendar always looks like personal for the owner.
-		 *
-		 * | Calendar | isCopy  | edit details    | own attendance | guests | organizer
-		 * |----------|---------|-----------------|----------------|--------|----------
-		 * | Personal | no      | yes             | yes            | yes    | yes
-		 * | Personal | yes     | yes (local)     | yes            | no     | no
-		 * | Shared   | no      | yes***          | no             | no*    | no*
-		 * | Shared   | yes     | yes*** (local)  | no**           | no*    | no*
-		 *
-		 *   * we don't allow sharing in other people's calendar because later only organizer can modify event and
-		 *   we don't want to prevent calendar owner from editing events in their own calendar.
-		 *
-		 *   ** this is not "our" copy of the event, from the point of organizer we saw it just accidentally.
-		 *   Later we might support proposing ourselves as attendee but currently organizer should be asked to
-		 *   send out the event.
-		 *
-		 *   *** depends on share capability. Cannot edit if it's not a copy and there are attendees.
-		 */
-
-
-		if (!existingEvent) {
-			this._eventType = EventType.OWN
-		} else {
-			// OwnerGroup is not set for events from file
-			const calendarInfoForEvent = existingEvent._ownerGroup && calendars.get(existingEvent._ownerGroup)
-			if (calendarInfoForEvent) {
-				if (calendarInfoForEvent.shared) {
-					this._eventType = hasCapabilityOnGroup(this._user, calendarInfoForEvent.group, ShareCapability.Write)
-						? EventType.SHARED_RW
-						: EventType.SHARED_RO
-				} else {
-					this._eventType = existingEvent.isCopy ? EventType.INVITE : EventType.OWN
-				}
-			} else {
-				// We can edit new invites (from files)
-				this._eventType = EventType.INVITE
-			}
-		}
-
-		this.readOnly = this._eventType !== EventType.OWN
-			&& this._eventType !== EventType.INVITE
-			&& (this._eventType !== EventType.SHARED_RW || assertNotNull(existingEvent).attendees.length !== 0)
-
-		this.possibleOrganizers = existingOrganizer && !this.canModifyOrganizer()
-			? [existingOrganizer]
-			: existingOrganizer && !this._mailAddresses.includes(existingOrganizer.address)
-				? [existingOrganizer].concat(this._ownPossibleOrganizers(mailboxDetail, userController))
-				: this._ownPossibleOrganizers(mailboxDetail, userController)
-
-		if (existingEvent) {
-			this.summary(existingEvent.summary)
-			const calendarForGroup = calendars.get(neverNull(existingEvent._ownerGroup))
-			if (calendarForGroup) {
-				this.selectedCalendar(calendarForGroup)
-			}
-			this.allDay(isAllDayEvent(existingEvent))
-			this.startDate = getStartOfDayWithZone(getEventStart(existingEvent, this._zone), this._zone)
-			if (this.allDay()) {
-				this.endDate = incrementDate(getEventEnd(existingEvent, this._zone), -1)
-				this._setDefaultTimes(date)
-			} else {
-				this.startTime = timeStringInZone(getEventStart(existingEvent, this._zone), this.amPmFormat, this._zone)
-				this.endTime = timeStringInZone(getEventEnd(existingEvent, this._zone), this.amPmFormat, this._zone)
-				this.endDate = getStartOfDayWithZone(getEventEnd(existingEvent, this._zone), this._zone)
-			}
-
-			if (existingEvent.repeatRule) {
-				const existingRule = existingEvent.repeatRule
-				const repeat = {
-					frequency: downcast(existingRule.frequency),
-					interval: Number(existingRule.interval),
-					endType: downcast(existingRule.endType),
-					endValue: existingRule.endType === EndType.Count ? Number(existingRule.endValue) : 1,
-				}
-				if (existingRule.endType === EndType.UntilDate) {
-					const rawEndDate = new Date(Number(existingRule.endValue))
-					const localDate = this.allDay() ? getAllDayDateForTimezone(rawEndDate, this._zone) : rawEndDate
-					// Shown date is one day behind the actual end (for us it's excluded)
-					const shownDate = incrementByRepeatPeriod(localDate, RepeatPeriod.DAILY, -1, this._zone)
-					repeat.endValue = shownDate.getTime()
-				}
-				this.repeat = repeat
-			} else {
-				this.repeat = null
-			}
-			this.location(existingEvent.location)
-			this.note = existingEvent.description
-
-			this._calendarModel.loadAlarms(existingEvent.alarmInfos, this._user).then((alarms) => {
-				alarms.forEach((alarm) => this.addAlarm(downcast(alarm.alarmInfo.trigger)))
-			})
-		} else {
-			this._setDefaultTimes(date)
-			this.startDate = getStartOfDayWithZone(date, this._zone)
-			this.endDate = getStartOfDayWithZone(date, this._zone)
-			m.redraw()
-		}
 	}
 
-	_setDefaultTimes(date: Date) {
+	_setDefaultTimes(date: Date = getNextHalfHour()) {
 		const endTimeDate = new Date(date)
 		endTimeDate.setMinutes(endTimeDate.getMinutes() + 30)
 		this.startTime = timeString(date, this.amPmFormat)
@@ -338,6 +353,7 @@ export class CalendarEventViewModel {
 	}
 
 	onStartTimeSelected(value: string) {
+		this._oldStartTime = this.startTime
 		this.startTime = value
 		if (this.startDate.getTime() === this.endDate.getTime()) {
 			this._adjustEndTime()
@@ -362,6 +378,11 @@ export class CalendarEventViewModel {
 		}
 	}
 
+	isReadOnlyEvent(): boolean {
+		return this._eventType === EventType.SHARED_RO
+			|| this._eventType === EventType.SHARED_RW && this.attendees().length > 0
+	}
+
 	_adjustEndTime() {
 		const parsedOldStartTime = this._oldStartTime && parseTime(this._oldStartTime)
 		const parsedStartTime = parseTime(this.startTime)
@@ -379,7 +400,6 @@ export class CalendarEventViewModel {
 		}
 		const newEndMinutes = newEndTotalMinutes % 60
 		this.endTime = timeStringFromParts(newEndHours, newEndMinutes, this.amPmFormat)
-		this._oldStartTime = this.startTime
 	}
 
 	onStartDateSelected(date: ?Date) {
@@ -475,8 +495,9 @@ export class CalendarEventViewModel {
 	}
 
 	canModifyGuests(): boolean {
-		return (this._eventType === EventType.OWN || this._eventType === EventType.INVITE)
-			&& (!this.existingEvent || !this.existingEvent.isCopy)
+		// It is not allowed to modify guests in shared calendar or invite.
+		const selectedCalendar = this.selectedCalendar()
+		return selectedCalendar != null && !selectedCalendar.shared && this._eventType !== EventType.INVITE
 	}
 
 	removeAttendee(guest: Guest) {
@@ -586,6 +607,7 @@ export class CalendarEventViewModel {
 		if (this._processing) {
 			return Promise.resolve(false)
 		}
+		const selectedCalendar = this.selectedCalendar()
 		this._processing = true
 		return Promise.resolve().then(() => {
 			// We have to use existing instance to get all the final fields correctly
@@ -627,7 +649,7 @@ export class CalendarEventViewModel {
 			newEvent.invitedConfidentially = this.isConfidential()
 			newEvent.uid = this.existingEvent && this.existingEvent.uid
 				? this.existingEvent.uid
-				: generateUid(this.selectedCalendar().group._id, Date.now())
+				: generateUid(assertNotNull(selectedCalendar).group._id, Date.now())
 			const repeat = this.repeat
 			if (repeat == null) {
 				newEvent.repeatRule = null
@@ -656,7 +678,6 @@ export class CalendarEventViewModel {
 						}
 						if (existingEvent.attendees.find(ea => ea.address.address === guest.address.address)) {
 							existingAttendees.push(guest)
-						} else {
 						}
 					})
 				}
@@ -681,7 +702,7 @@ export class CalendarEventViewModel {
 				if (this._user.accountType === AccountType.EXTERNAL) {
 					return Promise.resolve()
 				}
-				const groupRoot = this.selectedCalendar().groupRoot
+				const groupRoot = assertNotNull(this.selectedCalendar()).groupRoot
 				if (existingEvent == null || existingEvent._id == null) {
 					return this._calendarModel.createEvent(newEvent, newAlarms, this._zone, groupRoot)
 				} else {
@@ -854,6 +875,21 @@ export class CalendarEventViewModel {
 					.some(recipient => this._inviteModel.getPasswordStrength(recipient) < 80)
 			})
 		})
+	}
+
+	getAvailableCalendars(): Array<CalendarInfo> {
+		// Prevent moving the calendar to another calendar if you only have read permission or if the event has attendees.
+		if (this.isReadOnlyEvent()) {
+			return this.calendars
+			           .filter((calendarInfo) => calendarInfo.group._id === assertNotNull(this.existingEvent)._ownerGroup)
+		} else if (this.attendees().length && this._eventType !== EventType.INVITE) {
+			// We don't allow inviting in a shared calendar. If we have attendees, we cannot select a shared calendar
+			return this.calendars
+			           .filter((calendarInfo) => !calendarInfo.shared)
+		} else {
+			return this.calendars
+			           .filter((calendarInfo) => hasCapabilityOnGroup(this._user, calendarInfo.group, ShareCapability.Write))
+		}
 	}
 
 	_allRecipients(): Array<RecipientInfo> {

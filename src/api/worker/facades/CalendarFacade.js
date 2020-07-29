@@ -71,8 +71,8 @@ export class CalendarFacade {
 				event.hashedUid = hashUid(event.uid)
 				if (oldEvent) {
 					return erase(oldEvent)
-				.catch(NotFoundError, noOp)
-				.catch(LockedError, noOp)
+						.catch(NotFoundError, noOp)
+						.catch(LockedError, noOp)
 				}
 			})
 			.then(() =>
@@ -108,11 +108,11 @@ export class CalendarFacade {
 			.then(userAlarmIdsWithAlarmNotifications => {
 				const userAlarmInfoListId = neverNull(user.alarmInfoList).alarms
 				// Remove all alarms which belongs to the current user. We need to be careful about other users' alarms.
+				// Server takes care of the removed alarms,
 				newEvent.alarmInfos = existingEvent.alarmInfos.filter((a) => !isSameId(listIdPart(a), userAlarmInfoListId))
 				if (userAlarmIdsWithAlarmNotifications) {
 					newEvent.alarmInfos.push(...userAlarmIdsWithAlarmNotifications.map(([id]) => id))
 				}
-
 				return update(newEvent)
 					.then(() => {
 						if (userAlarmIdsWithAlarmNotifications) {
@@ -246,11 +246,18 @@ export class CalendarFacade {
 	}
 
 	getEventByUid(uid: string): Promise<?CalendarEvent> {
+
 		const calendarMemberships = this._loginFacade.getLoggedInUser().memberships.filter(m => m.groupType === GroupType.Calendar)
 		return Promise
 			.reduce(calendarMemberships, (acc, membership) => {
-				// short-circuit if we find the thing
-				return acc || load(CalendarGroupRootTypeRef, membership.group)
+				// short-circuit if we've already found the event
+				if (acc) {
+					return acc
+				}
+				if (membership.capability != null) {
+					return Promise.resolve(null) // do not search in the shared groups
+				}
+				return load(CalendarGroupRootTypeRef, membership.group)
 					.then((groupRoot) =>
 						groupRoot.index && load(CalendarEventUidIndexTypeRef, [
 							groupRoot.index.list,

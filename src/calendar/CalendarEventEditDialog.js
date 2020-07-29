@@ -66,8 +66,8 @@ export function showCalendarEventDialog(date: Date, calendars: Map<Id, CalendarI
                                         existingEvent: ?CalendarEvent, responseMail: ?Mail) {
 	const viewModel = createCalendarEventViewModel(date, calendars, mailboxDetail, existingEvent, responseMail, false)
 	const startOfTheWeekOffset = getStartOfTheWeekOffsetForUser()
-	const startDatePicker = new DatePicker(startOfTheWeekOffset, "dateFrom_label", "emptyString_msg", viewModel.readOnly)
-	const endDatePicker = new DatePicker(startOfTheWeekOffset, "dateTo_label", "emptyString_msg", viewModel.readOnly)
+	const startDatePicker = new DatePicker(startOfTheWeekOffset, "dateFrom_label", "emptyString_msg", viewModel.isReadOnlyEvent())
+	const endDatePicker = new DatePicker(startOfTheWeekOffset, "dateTo_label", "emptyString_msg", viewModel.isReadOnlyEvent())
 	startDatePicker.date.map((date) => viewModel.onStartDateSelected(date))
 	endDatePicker.date.map((date) => viewModel.onEndDateSelected(date))
 
@@ -113,7 +113,7 @@ export function showCalendarEventDialog(date: Date, calendars: Map<Id, CalendarI
 	)
 		.setMinHeight(400)
 		.showBorders()
-		.setEnabled(!viewModel.readOnly)
+		.setEnabled(!viewModel.isReadOnlyEvent())
 		// We only set it once, we don't viewModel on every change, that would be slow
 		.setValue(viewModel.note)
 
@@ -219,7 +219,7 @@ export function showCalendarEventDialog(date: Date, calendars: Map<Id, CalendarI
 					value: viewModel.startTime,
 					onselected: (time) => viewModel.onStartTimeSelected(time),
 					amPmFormat: viewModel.amPmFormat,
-					disabled: viewModel.readOnly
+					disabled: viewModel.isReadOnlyEvent()
 				}))
 				: null
 		],
@@ -230,7 +230,7 @@ export function showCalendarEventDialog(date: Date, calendars: Map<Id, CalendarI
 					value: viewModel.endTime,
 					onselected: (time) => viewModel.onEndTimeSelected(time),
 					amPmFormat: viewModel.amPmFormat,
-					disabled: viewModel.readOnly
+					disabled: viewModel.isReadOnlyEvent()
 				}))
 				: null
 		]
@@ -239,7 +239,7 @@ export function showCalendarEventDialog(date: Date, calendars: Map<Id, CalendarI
 	const renderLocationField = () => m(TextFieldN, {
 		label: "location_label",
 		value: viewModel.location,
-		disabled: viewModel.readOnly,
+		disabled: viewModel.isReadOnlyEvent(),
 		injectionsRight: () => {
 			let address = encodeURIComponent(viewModel.location())
 			if (address === "") {
@@ -256,15 +256,16 @@ export function showCalendarEventDialog(date: Date, calendars: Map<Id, CalendarI
 	})
 
 	function renderCalendarPicker() {
-		return m(".flex-half.pr-s", (viewModel.calendars.length)
+		const availableCalendars = viewModel.getAvailableCalendars()
+		return m(".flex-half.pr-s", (availableCalendars.length)
 			? m(DropDownSelectorN, ({
 				label: "calendar_label",
-				items: viewModel.calendars.map((calendarInfo) => {
+				items: availableCalendars.map((calendarInfo) => {
 					return {name: getCalendarName(calendarInfo.groupInfo, calendarInfo.shared), value: calendarInfo}
 				}),
 				selectedValue: viewModel.selectedCalendar,
 				icon: BootIcons.Expand,
-				disabled: viewModel.readOnly
+				disabled: viewModel.isReadOnlyEvent()
 			}: DropDownSelectorAttrs<CalendarInfo>))
 			: null
 		)
@@ -284,7 +285,7 @@ export function showCalendarEventDialog(date: Date, calendars: Map<Id, CalendarI
 			selectedValue: repeatFrequencyStream(viewModel.repeat && viewModel.repeat.frequency || null),
 			selectionChangedHandler: (period) => viewModel.onRepeatPeriodSelected(period),
 			icon: BootIcons.Expand,
-			disabled: viewModel.readOnly,
+			disabled: viewModel.isReadOnlyEvent(),
 		})
 	}
 
@@ -295,7 +296,7 @@ export function showCalendarEventDialog(date: Date, calendars: Map<Id, CalendarI
 			selectedValue: repeatIntervalStream(viewModel.repeat && viewModel.repeat.interval || 1),
 			selectionChangedHandler: (period) => viewModel.onRepeatIntervalChanged(period),
 			icon: BootIcons.Expand,
-			disabled: viewModel.readOnly
+			disabled: viewModel.isReadOnlyEvent()
 		})
 	}
 
@@ -306,7 +307,7 @@ export function showCalendarEventDialog(date: Date, calendars: Map<Id, CalendarI
 				selectedValue: endTypeStream(repeat.endType),
 				selectionChangedHandler: (period) => viewModel.onRepeatEndTypeChanged(period),
 				icon: BootIcons.Expand,
-				disabled: viewModel.readOnly,
+				disabled: viewModel.isReadOnlyEvent(),
 			}
 		)
 	}
@@ -354,7 +355,7 @@ export function showCalendarEventDialog(date: Date, calendars: Map<Id, CalendarI
 				m(".flex.items-center.mt-s", [
 					m(CheckboxN, {
 						checked: viewModel.allDay,
-						disabled: viewModel.readOnly,
+						disabled: viewModel.isReadOnlyEvent(),
 						label: () => lang.get("allDay_label")
 					}),
 					m(".flex-grow"),
@@ -400,7 +401,7 @@ export function showCalendarEventDialog(date: Date, calendars: Map<Id, CalendarI
 		return m(TextFieldN, {
 			label: "title_placeholder",
 			value: viewModel.summary,
-			disabled: viewModel.readOnly,
+			disabled: viewModel.isReadOnlyEvent(),
 			class: "big-input pt flex-grow",
 			injectionsRight: () => m(ExpanderButtonN, {
 				label: "guests_label",

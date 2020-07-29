@@ -1139,3 +1139,4 @@ export type TranslationKeyType =
 	| "attending_label"
 	| "invalidCalendarFile_msg"
 	| "attendeeNotFound_msg"
+	| "eventNotificationUpdated_msg"

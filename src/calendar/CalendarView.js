@@ -27,7 +27,7 @@ import {
 	getCalendarName,
 	getCapabilityText,
 	getEventStart,
-	getMonth,
+	getMonth, getNextHalfHour,
 	getStartOfTheWeekOffset,
 	getStartOfWeek,
 	getTimeZone,
@@ -700,7 +700,7 @@ export class CalendarView implements CurrentView {
 		if (date == null) {
 			switch (this._currentViewType) {
 				case CalendarViewType.AGENDA:
-					dateToUse = this._getNextHalfHour()
+					dateToUse = getNextHalfHour()
 					break
 				case CalendarViewType.MONTH:
 					// use the current day if it is visible in the displayed month, otherwise use the start of the month
@@ -738,23 +738,13 @@ export class CalendarView implements CurrentView {
 	 */
 	_getNewEventStartDate(currentDayStartOfView: Date, visibleStartOfView: Date): Date {
 		if (isSameDay(currentDayStartOfView, visibleStartOfView)) {
-			let nextHalfHour = this._getNextHalfHour()
+			let nextHalfHour = getNextHalfHour()
 			// only use the next half hour if it is not already on the next day, i.e. the current time is <= 23:30
 			if (isSameDay(nextHalfHour, new Date())) {
 				return nextHalfHour
 			}
 		}
 		return getHourOfDay(visibleStartOfView, DEFAULT_HOUR_OF_DAY)
-	}
-
-	_getNextHalfHour() {
-		let date: Date = new Date()
-		if (date.getMinutes() > 30) {
-			date.setHours(date.getHours() + 1, 0)
-		} else {
-			date.setMinutes(30)
-		}
-		return date
 	}
 
 	view() {

@@ -68,7 +68,7 @@ export class CalendarEventPopup implements ModalComponent {
 						icon: () => Icons.Edit,
 						colors: ButtonColors.DrawerNav,
 					}),
-					!this._viewModel.readOnly
+					!this._viewModel.isReadOnlyEvent()
 						? m(ButtonN, {
 							label: "delete_action",
 							click: () => deleteEvent(this._viewModel).then((confirmed) => {
@@ -138,7 +138,7 @@ function showMobileDialog(viewModel: CalendarEventViewModel, event: CalendarEven
 				icon: () => Icons.Edit,
 				colors: ButtonColors.DrawerNav,
 			}
-		].concat(!viewModel.readOnly ? {
+		].concat(!viewModel.isReadOnlyEvent() ? {
 				label: "delete_action",
 				click: () => deleteEvent(viewModel).then((confirmed) => {
 					if (confirmed) dialog.close()

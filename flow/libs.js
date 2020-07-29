@@ -134,7 +134,7 @@ interface Ospec {
 	(string, (done: DoneFn, timeout: TimeoutFn) => mixed): void;
 
 	spec: (string, () => mixed) => void;
-	only: (string, (done: DoneFn, timeout: TimeoutFn) => mixed, () => mixed) => void;
+	only: (string, (done: DoneFn, timeout: TimeoutFn) => mixed) => void;
 	before: ((DoneFn, TimeoutFn) => mixed) => void;
 	after: ((DoneFn, TimeoutFn) => mixed) => void;
 	beforeEach: ((DoneFn, TimeoutFn) => mixed) => void;

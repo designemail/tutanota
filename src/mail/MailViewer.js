@@ -864,7 +864,10 @@ export class MailViewer {
 			return Promise.map(mail.attachments, fileId => load(FileTypeRef, fileId))
 			              .then(files => {
 				              const calendarFile = files.find(a => a.mimeType && a.mimeType.startsWith(CALENDAR_MIME_TYPE))
-				              if (calendarFile && mail.method === MailMethod.ICAL_REQUEST && mail.state === MailState.RECEIVED) {
+				              if (calendarFile
+					              && (mail.method === MailMethod.ICAL_REQUEST || mail.method === MailMethod.ICAL_REPLY)
+					              && mail.state === MailState.RECEIVED
+				              ) {
 					              Promise.all([
 						              getEventFromFile(calendarFile),
 						              this._getSenderOfResponseMail()

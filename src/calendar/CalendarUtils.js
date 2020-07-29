@@ -563,7 +563,7 @@ export function formatEventDuration(event: CalendarEvent, zone: string) {
 		} else {
 			endString = formatDateTime(endTime)
 		}
-			return `${startString} - ${endString} ${getTimeZone()}`
+		return `${startString} - ${endString} ${getTimeZone()}`
 	}
 }
 
@@ -586,4 +586,14 @@ export function calendarAttendeeStatusSymbol(status: CalendarAttendeeStatusEnum)
 export function incrementSequence(sequence: string): string {
 	const current = filterInt(sequence) || 0
 	return String(current + 1)
+}
+
+export function getNextHalfHour() {
+	let date: Date = new Date()
+	if (date.getMinutes() > 30) {
+		date.setHours(date.getHours() + 1, 0)
+	} else {
+		date.setMinutes(30)
+	}
+	return date
 }

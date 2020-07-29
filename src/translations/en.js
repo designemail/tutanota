@@ -1152,5 +1152,6 @@ module.exports = {
 		"updateSent_msg": "Update sent!",
 		"invalidCalendarFile_msg": "Calendar file is invalid.",
 		"attendeeNotFound_msg": "You are not an attendee of this event.",
+		"eventNotificationUpdated_msg": "Event was updated in your calendar."
 	}
 }

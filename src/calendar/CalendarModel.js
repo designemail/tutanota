@@ -372,12 +372,14 @@ export class CalendarModelImpl implements CalendarModel {
 		}
 	}
 
-	/** Create new event or re-create existing one when significant parts (like start time) have changed */
 	createEvent(event: CalendarEvent, alarmInfos: Array<AlarmInfo>, zone: string, groupRoot: CalendarGroupRoot): Promise<void> {
 		return this._doCreate(event, zone, groupRoot, alarmInfos)
 	}
 
-	/** Update existing event when time did not change */
+	/**
+	 * Update existing event.
+	 * @param newAlarms - current state of alarms belonging to the user.
+	 * */
 	updateEvent(newEvent: CalendarEvent, newAlarms: Array<AlarmInfo>, zone: string, groupRoot: CalendarGroupRoot,
 	            existingEvent: CalendarEvent
 	): Promise<void> {
