@@ -27,6 +27,30 @@ function loadOrCreateCalendarInfo(): Promise<Map<Id, CalendarInfo>> {
 			: worker.addCalendar("").then(() => loadCalendarInfos()))
 }
 
+function getOrCreatePrivateCalendar(): Promise<?CalendarInfo> {
+	if (!logins.isInternalUserLoggedIn()) {
+		return Promise.resolve(null)
+	} else {
+		return loadCalendarInfos()
+			.then((calendarInfo) => {
+				// addCalendar() has special hack to update memberships immediately so it's safe to load it right away.
+				// Otherwise membership might now have been there yet.
+				return findPrivateCalendar(calendarInfo) || worker.addCalendar("")
+				                                                  .then(() => loadCalendarInfos())
+				                                                  .then(findPrivateCalendar)
+			})
+	}
+}
+
+function findPrivateCalendar(calendarInfo: Map<Id, CalendarInfo>): ?CalendarInfo {
+	for (const calendar of calendarInfo.values()) {
+		if (!calendar.shared) {
+			return calendar
+		}
+	}
+	return null
+}
+
 function getParsedEvent(fileData: DataFile): ?{method: CalendarMethodEnum, event: CalendarEvent, uid: string} {
 	try {
 		const {contents, method} = parseCalendarFile(fileData)
@@ -89,10 +113,9 @@ export function replyToEventInvitation(
 	eventClone.sequence = incrementSequence(eventClone.sequence)
 
 	return Promise.all([
-		loadOrCreateCalendarInfo(),
+		getOrCreatePrivateCalendar(),
 		locator.mailModel.getMailboxDetailsForMail(previousMail)
-	]).then(([calendars, mailboxDetails]) => {
-		const calendar: ?CalendarInfo = logins.isInternalUserLoggedIn() ? firstThrow(Array.from(calendars.values())) : null
+	]).then(([calendar, mailboxDetails]) => {
 		const sendMailModel = new SendMailModel(logins, locator.mailModel, locator.contactModel, locator.eventController, mailboxDetails)
 		return calendarUpdateDistributor
 			.sendResponse(eventClone, sendMailModel, foundAttendee.address.address, previousMail, decision)

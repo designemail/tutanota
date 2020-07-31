@@ -133,13 +133,16 @@ export function showCalendarEventDialog(date: Date, calendars: Map<Id, CalendarI
 				let alertDialog: Dialog
 				const cancelButton = {
 					label: "cancel_action",
-					click: () => alertDialog.close(),
+					click: () => {
+						resolve("cancel")
+						alertDialog.close()
+					},
 					type: ButtonType.Secondary
 				}
 				const noButton = {
 					label: "no_label",
 					click: () => {
-						resolve(false)
+						resolve("no")
 						alertDialog.close()
 					},
 					type: ButtonType.Secondary
@@ -147,15 +150,15 @@ export function showCalendarEventDialog(date: Date, calendars: Map<Id, CalendarI
 				const yesButton = {
 					label: "yes_label",
 					click: () => {
-						resolve(true)
+						resolve("yes")
 						alertDialog.close()
 					},
 					type: ButtonType.Primary,
 				}
 
 				const onclose = (positive) => positive
-					? resolve(true)
-					: finish()
+					? resolve("yes")
+					: resolve("cancel")
 				alertDialog = Dialog.alert("sendUpdates_msg", [cancelButton, noButton, yesButton], onclose)
 			})
 		}

@@ -591,7 +591,7 @@ export class CalendarEventViewModel {
 	 */
 	saveAndSend(
 		{askForUpdates, askInsecurePassword, showProgress}: {
-			askForUpdates: () => Promise<boolean>,
+			askForUpdates: () => Promise<"yes" | "no" | "cancel">,
 			askInsecurePassword: () => Promise<boolean>,
 			showProgress: (Promise<mixed> => mixed),
 		}
@@ -708,17 +708,23 @@ export class CalendarEventViewModel {
 				if (existingAttendees.length || this._cancelModel._bccRecipients.length) {
 					// ask for update
 					return askForUpdates().then((sendOutUpdate) => {
-						return Promise.resolve(sendOutUpdate ? passwordCheck() : true)
+						if (sendOutUpdate === "cancel") {
+							return false
+						}
+						// Do check passwords if there are new recipients. We already made decision for those who we invited before
+						return Promise.resolve(this._inviteModel._bccRecipients.length ? passwordCheck() : true)
 						              .then((send) => {
+							              // User said to not send despite insecure password, stop
 							              if (!send) return false
 
+							              // Invites are cancellations are sent out independent of the updates decision
 							              const p = this._sendInvite(newEvent)
 							                            .then(() => this._cancelModel._bccRecipients.length
 								                            ? this._distributor.sendCancellation(newEvent, this._cancelModel)
 								                            : Promise.resolve())
 							                            .then(() => doCreateEvent())
 							                            .then(() => {
-								                            if (sendOutUpdate && existingAttendees.length) {
+								                            if (sendOutUpdate === "yes" && existingAttendees.length) {
 									                            return this._distributor.sendUpdate(newEvent, this._updateModel)
 								                            }
 							                            })
@@ -728,7 +734,7 @@ export class CalendarEventViewModel {
 						              })
 					})
 				} else {
-					// just create the event if there are no existing recipients
+					// just create the event and send invites if there are no existing recipients
 					return passwordCheck().then((send) => {
 						if (!send) return false
 						const p = this._sendInvite(newEvent)
