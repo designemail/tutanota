@@ -45,7 +45,7 @@ export const _TypeModel: TypeModel = {
 		},
 		"method": {
 			"name": "method",
-			"id": 1117,
+			"id": 1116,
 			"since": 42,
 			"type": "Number",
 			"cardinality": "One",

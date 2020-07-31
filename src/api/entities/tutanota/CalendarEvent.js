@@ -90,20 +90,11 @@ export const _TypeModel: TypeModel = {
 		},
 		"invitedConfidentially": {
 			"name": "invitedConfidentially",
-			"id": 1091,
+			"id": 1090,
 			"since": 42,
 			"type": "Boolean",
 			"cardinality": "ZeroOrOne",
 			"final": false,
-			"encrypted": true
-		},
-		"isCopy": {
-			"name": "isCopy",
-			"id": 1090,
-			"since": 42,
-			"type": "Boolean",
-			"cardinality": "One",
-			"final": true,
 			"encrypted": true
 		},
 		"location": {
@@ -155,7 +146,7 @@ export const _TypeModel: TypeModel = {
 	"associations": {
 		"attendees": {
 			"name": "attendees",
-			"id": 1092,
+			"id": 1091,
 			"since": 42,
 			"type": "AGGREGATION",
 			"cardinality": "Any",
@@ -164,7 +155,7 @@ export const _TypeModel: TypeModel = {
 		},
 		"organizer": {
 			"name": "organizer",
-			"id": 1093,
+			"id": 1092,
 			"since": 42,
 			"type": "AGGREGATION",
 			"cardinality": "ZeroOrOne",
@@ -212,7 +203,6 @@ export type CalendarEvent = {
 	endTime: Date;
 	hashedUid: ?Uint8Array;
 	invitedConfidentially: ?boolean;
-	isCopy: boolean;
 	location: string;
 	sequence: NumberString;
 	startTime: Date;
