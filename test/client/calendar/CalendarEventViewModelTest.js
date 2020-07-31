@@ -688,13 +688,14 @@ o.spec("CalendarEventViewModel", function () {
 			const viewModel = init({calendars, existingEvent, calendarModel, distributor})
 			viewModel.onStartDateSelected(new Date(2020, 4, 3))
 			viewModel.removeAttendee(toRemoveGuest)
-			askForUpdates = o.spy(() => Promise.resolve("yes"))
+			askForUpdates = o.spy()
 
 			o(await viewModel.saveAndSend({askForUpdates, askInsecurePassword, showProgress})).equals(true)
 			o(calendarModel.updateEvent.calls.length).equals(1)("created event")
 			o(distributor.sendCancellation.calls[0].args[1]).equals(cancelModel)
 			o(cancelModel._bccRecipients.map(getAddress)).deepEquals([toRemoveGuest.address.address])
-			o(askForUpdates.calls.length).equals(1)
+			// There are only removed guests, we always send to them
+			o(askForUpdates.calls.length).equals(0)
 			o(askInsecurePassword.calls).deepEquals([])
 		})
 

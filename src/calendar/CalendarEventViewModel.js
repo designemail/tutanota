@@ -20,13 +20,13 @@ import stream from "mithril/stream/stream.js"
 import {copyMailAddress, getDefaultSenderFromUser, getEnabledMailAddressesWithUser, getSenderNameForUser} from "../mail/MailUtils"
 import {
 	createRepeatRuleWithValues,
-	filterInt,
 	generateUid,
 	getAllDayDateForTimezone,
 	getAllDayDateUTCFromZone,
 	getDiffInDays,
 	getEventEnd,
-	getEventStart, getNextHalfHour,
+	getEventStart,
+	getNextHalfHour,
 	getStartOfDayWithZone,
 	getStartOfNextDayWithZone,
 	getTimeZone,
@@ -67,10 +67,10 @@ const TIMESTAMP_ZERO_YEAR = 1970
 export type EventCreateResult = boolean
 
 const EventType = Object.freeze({
-	OWN: "own",
-	SHARED_RO: "shared_ro",
-	SHARED_RW: "shared_rw",
-	INVITE: "invite",
+	OWN: "own", // event in our own calendar and we are organizer
+	SHARED_RO: "shared_ro", // event in shared calendar with read permission
+	SHARED_RW: "shared_rw", // event in shared calendar with write permission
+	INVITE: "invite", // invite from calendar invitation which is not stored in calendar yet, or event stored and we are not organizer
 })
 type EventTypeEnum = $Values<typeof EventType>
 
@@ -90,6 +90,8 @@ type RepeatData = {|
 	endType: EndTypeEnum,
 	endValue: number
 |}
+
+type ShowProgressCallback = Promise<mixed> => mixed
 
 /**
  * ViewModel for viewing/editing the event. Takes care of sending out updates.
@@ -170,7 +172,6 @@ export class CalendarEventViewModel {
 		this._zone = zone
 		this.alarms = []
 		this._user = userController.user
-
 		this._guestStatuses = this._initGuestStatus(existingEvent, resolveRecipientsLazily)
 		this.attendees = this._initAttendees()
 		if (existingEvent) {
@@ -524,11 +525,12 @@ export class CalendarEventViewModel {
 	}
 
 	canModifyOwnAttendance(): boolean {
-		return (this._eventType === EventType.OWN || this._eventType === EventType.INVITE)
-			&& (this._viewingOwnEvent() || !!this.findOwnAttendee())
+		// We can always modify own attendance in own event. Also can modify if it's invite in our calendar and we are invited.
+		return this._eventType === EventType.OWN || (this._eventType === EventType.INVITE && !!this.findOwnAttendee())
 	}
 
 	canModifyOrganizer(): boolean {
+		// We can only modify the organizer if it is our own event and there are no guests
 		return this._eventType === EventType.OWN
 			&& (!this.existingEvent
 				|| (this.existingEvent.attendees.length === 0)
@@ -539,6 +541,7 @@ export class CalendarEventViewModel {
 	setOrganizer(newOrganizer: EncryptedMailAddress): void {
 		if (this.canModifyOrganizer()) {
 			this.organizer = newOrganizer
+			// we always add the organizer to the attendee list
 			this._ownAttendee(newOrganizer)
 		}
 	}
@@ -547,11 +550,6 @@ export class CalendarEventViewModel {
 		return this._eventType === EventType.OWN
 			|| this._eventType === EventType.INVITE
 			|| this._eventType === EventType.SHARED_RW
-	}
-
-	_viewingOwnEvent(): boolean {
-		// it is our own event if it is a new event, existing event without organizer or we are organizer
-		return this._eventType === EventType.OWN
 	}
 
 	deleteEvent(): Promise<void> {
@@ -564,6 +562,40 @@ export class CalendarEventViewModel {
 		} else {
 			return Promise.resolve()
 		}
+	}
+
+	/**
+	 * @reject UserError
+	 */
+	saveAndSend(
+		{askForUpdates, askInsecurePassword, showProgress}: {
+			askForUpdates: () => Promise<"yes" | "no" | "cancel">,
+			askInsecurePassword: () => Promise<boolean>,
+			showProgress: ShowProgressCallback,
+		}
+	): Promise<EventCreateResult> {
+		if (this._processing) {
+			return Promise.resolve(false)
+		}
+		this._processing = true
+		return Promise.resolve().then(() => {
+			const newEvent = this._initializeNewEvent()
+			const newAlarms = this.alarms.slice()
+			if (this._eventType === EventType.OWN) {
+				// It is our own event. We might need to send out invites/cancellations/updates
+				return this._sendNotificationAndSave(askInsecurePassword, askForUpdates, showProgress, newEvent, newAlarms)
+			} else if (this._eventType === EventType.INVITE) {
+				// We have been invited by another person (internal/ unsecure external)
+				return this._respondToOrganizerAndSave(showProgress, assertNotNull(this.existingEvent), newEvent, newAlarms)
+			} else {
+				// This is event in a shared calendar. We cannot send anything because it's not our event.
+				const p = this._saveEvent(newEvent, newAlarms)
+				showProgress(p)
+				return p.return(true)
+			}
+		}).finally(() => {
+			this._processing = false
+		})
 	}
 
 	_sendCancellation(event: CalendarEvent): Promise<*> {
@@ -586,194 +618,55 @@ export class CalendarEventViewModel {
 		}
 	}
 
-	/**
-	 * @reject UserError
-	 */
-	saveAndSend(
-		{askForUpdates, askInsecurePassword, showProgress}: {
-			askForUpdates: () => Promise<"yes" | "no" | "cancel">,
-			askInsecurePassword: () => Promise<boolean>,
-			showProgress: (Promise<mixed> => mixed),
+
+	_saveEvent(newEvent: CalendarEvent, newAlarms: Array<AlarmInfo>): Promise<void> {
+		if (this._user.accountType === AccountType.EXTERNAL) {
+			return Promise.resolve()
 		}
-	): Promise<EventCreateResult> {
-		if (this._processing) {
-			return Promise.resolve(false)
+		const groupRoot = assertNotNull(this.selectedCalendar()).groupRoot
+		if (this.existingEvent == null || this.existingEvent._id == null) {
+			return this._calendarModel.createEvent(newEvent, newAlarms, this._zone, groupRoot)
+		} else {
+			return this._calendarModel.updateEvent(newEvent, newAlarms, this._zone, groupRoot, this.existingEvent)
 		}
-		const selectedCalendar = this.selectedCalendar()
-		this._processing = true
-		return Promise.resolve().then(() => {
-			// We have to use existing instance to get all the final fields correctly
-			// Using clone feels hacky but otherwise we need to save all attributes of the existing event somewhere and if dialog is
-			// cancelled we also don't want to modify passed event
-			const newEvent = this.existingEvent ? clone(this.existingEvent) : createCalendarEvent()
+	}
 
-			let startDate = new Date(this.startDate)
-			let endDate = new Date(this.endDate)
+	_sendNotificationAndSave(askInsecurePassword: () => Promise<boolean>, askForUpdates: () => Promise<"yes" | "no" | "cancel">,
+	                         showProgress: ShowProgressCallback, newEvent: CalendarEvent, newAlarms: Array<AlarmInfo>) {
+		// ask for update
+		const askForUpdatesAwait = this._updateModel._bccRecipients.length
+			? askForUpdates()
+			: Promise.resolve("no")
 
-			if (this.allDay()) {
-				startDate = getAllDayDateUTCFromZone(startDate, this._zone)
-				endDate = getAllDayDateUTCFromZone(getStartOfNextDayWithZone(endDate, this._zone), this._zone)
-			} else {
-				const parsedStartTime = parseTime(this.startTime)
-				const parsedEndTime = parseTime(this.endTime)
-				if (!parsedStartTime || !parsedEndTime) {
-					throw new UserError("timeFormatInvalid_msg")
-				}
-				startDate = DateTime.fromJSDate(startDate, {zone: this._zone})
-				                    .set({hour: parsedStartTime.hours, minute: parsedStartTime.minutes})
-				                    .toJSDate()
+		const passwordCheck = () => this.hasInsecurePasswords().then((hasInsecure) => hasInsecure ? askInsecurePassword() : true)
 
-				// End date is never actually included in the event. For the whole day event the next day
-				// is the boundary. For the timed one the end time is the boundary.
-				endDate = DateTime.fromJSDate(endDate, {zone: this._zone})
-				                  .set({hour: parsedEndTime.hours, minute: parsedEndTime.minutes})
-				                  .toJSDate()
+		return askForUpdatesAwait.then(updateResponse => {
+			if (updateResponse === "cancel") {
+				return false
 			}
 
-			if (endDate.getTime() <= startDate.getTime()) {
-				throw new UserError("startAfterEnd_label")
-			}
-			newEvent.startTime = startDate
-			newEvent.description = this.note
-			newEvent.summary = this.summary()
-			newEvent.location = this.location()
-			newEvent.endTime = endDate
-			newEvent.invitedConfidentially = this.isConfidential()
-			newEvent.uid = this.existingEvent && this.existingEvent.uid
-				? this.existingEvent.uid
-				: generateUid(assertNotNull(selectedCalendar).group._id, Date.now())
-			const repeat = this.repeat
-			if (repeat == null) {
-				newEvent.repeatRule = null
-			} else {
-				newEvent.repeatRule = this.createRepeatRule(newEvent, repeat)
-			}
-			const newAlarms = this.alarms.slice()
-			newEvent.attendees = this.attendees().map((a) => createCalendarEventAttendee({
-				address: a.address,
-				status: a.status,
-			}))
-			if (this.existingEvent) {
-				newEvent.sequence = String(filterInt(this.existingEvent.sequence) + 1)
-			}
-
-			// We need to compute diff of attendees to know if we need to send out updates
-			let existingAttendees: Array<Guest> = []
-			const {existingEvent} = this
-			newEvent.organizer = this.organizer
-
-			if (this._viewingOwnEvent()) {
-				// if it is our own event we need to collect email addresses of attendees to send update notification.
-				if (existingEvent) {
-					this.attendees().forEach((guest) => {
-						if (this._mailAddresses.includes(guest.address.address)) {
-							return
-						}
-						if (existingEvent.attendees.find(ea => ea.address.address === guest.address.address)) {
-							existingAttendees.push(guest)
-						}
-					})
-				}
-			} else {
-				if (existingEvent) {
-					// We are not using this._findAttendee() because we want to search it on the event, before our modifications
-					const ownAttendee = existingEvent.attendees.find(a => this._mailAddresses.includes(a.address.address))
-					const going = ownAttendee && this._guestStatuses().get(ownAttendee.address.address)
-					if (ownAttendee && going !== CalendarAttendeeStatus.NEEDS_ACTION && ownAttendee.status !== going) {
-						ownAttendee.status = assertNotNull(going)
-						const sendResponseModel = this._sendModelFactory()
-						const organizer = assertNotNull(existingEvent.organizer)
-						sendResponseModel.addRecipient("to", {name: organizer.name, address: organizer.address, contact: null})
-						this._distributor.sendResponse(newEvent, sendResponseModel, ownAttendee.address.address, this._responseTo,
-							assertNotNull(going)
-						).then(() => sendResponseModel.dispose())
-					}
-				}
-			}
-
-			const doCreateEvent = () => {
-				if (this._user.accountType === AccountType.EXTERNAL) {
-					return Promise.resolve()
-				}
-				const groupRoot = assertNotNull(this.selectedCalendar()).groupRoot
-				if (existingEvent == null || existingEvent._id == null) {
-					return this._calendarModel.createEvent(newEvent, newAlarms, this._zone, groupRoot)
-				} else {
-					return this._calendarModel.updateEvent(newEvent, newAlarms, this._zone, groupRoot, existingEvent)
-				}
-			}
-
-			const passwordCheck = () => this.hasInsecurePasswords().then((hasInsecure) => hasInsecure ? askInsecurePassword() : true)
-			if (this._viewingOwnEvent()) {
-				if (existingAttendees.length || this._cancelModel._bccRecipients.length) {
-					// ask for update
-					return askForUpdates().then((sendOutUpdate) => {
-						if (sendOutUpdate === "cancel") {
-							return false
-						}
-						// Do check passwords if there are new recipients. We already made decision for those who we invited before
-						return Promise.resolve(this._inviteModel._bccRecipients.length ? passwordCheck() : true)
-						              .then((send) => {
-							              // User said to not send despite insecure password, stop
-							              if (!send) return false
-
-							              // Invites are cancellations are sent out independent of the updates decision
-							              const p = this._sendInvite(newEvent)
-							                            .then(() => this._cancelModel._bccRecipients.length
-								                            ? this._distributor.sendCancellation(newEvent, this._cancelModel)
-								                            : Promise.resolve())
-							                            .then(() => doCreateEvent())
-							                            .then(() => {
-								                            if (sendOutUpdate === "yes" && existingAttendees.length) {
-									                            return this._distributor.sendUpdate(newEvent, this._updateModel)
-								                            }
-							                            })
-							                            .then(() => true)
-							              showProgress(p)
-							              return p
-						              })
-					})
-				} else {
-					// just create the event and send invites if there are no existing recipients
-					return passwordCheck().then((send) => {
-						if (!send) return false
-						const p = this._sendInvite(newEvent)
-						              .then(() => doCreateEvent())
-						              .then(() => true)
-						showProgress(p)
-						return p
-					})
-				}
-			} else {
-				return passwordCheck()
-					.then((send) => {
-						if (send) {
-							const p = doCreateEvent()
-							showProgress(p)
-							return p
-						}
-					})
-					.then(() => true)
-			}
-		}).finally(() => {
-			console.log("finished saving", this._processing)
-			this._processing = false
+			// Do check passwords if there are new recipients. We already made decision for those who we invited before
+			return Promise.resolve(this._inviteModel._bccRecipients.length ? passwordCheck() : true)
+			              .then((passwordCheckPassed) => {
+				              if (!passwordCheckPassed) {
+					              // User said to not send despite insecure password, stop
+					              return false
+				              }
+				              // Invites are cancellations are sent out independent of the updates decision
+				              const p = this._sendInvite(newEvent)
+				                            .then(() => this._cancelModel._bccRecipients.length
+					                            ? this._distributor.sendCancellation(newEvent, this._cancelModel)
+					                            : Promise.resolve())
+				                            .then(() => this._saveEvent(newEvent, newAlarms))
+				                            .then(() => updateResponse === "yes"
+					                            ? this._distributor.sendUpdate(newEvent, this._updateModel)
+					                            : Promise.resolve())
+				                            .then(() => true)
+				              showProgress(p)
+				              return p
+			              })
 		})
 	}
-
-	selectGoing(going: CalendarAttendeeStatusEnum) {
-		if (this.canModifyOwnAttendance()) {
-			const ownAttendee = this._ownAttendee()
-			if (ownAttendee) {
-				this._guestStatuses(addMapEntry(this._guestStatuses(), ownAttendee.address, going))
-			} else if (this._eventType === EventType.OWN) {
-				const newOwnAttendee = createEncryptedMailAddress({address: firstThrow(this._mailAddresses)})
-				this._ownAttendee(newOwnAttendee)
-				this._guestStatuses(addMapEntry(this._guestStatuses(), newOwnAttendee.address, going))
-			}
-		}
-	}
-
 
 	_sendInvite(event: CalendarEvent): Promise<void> {
 		const newAttendees = event.attendees.filter((a) => a.status === CalendarAttendeeStatus.ADDED)
@@ -789,6 +682,42 @@ export class CalendarEventViewModel {
 			           })
 		} else {
 			return Promise.resolve()
+		}
+	}
+
+	_respondToOrganizerAndSave(showProgress: ShowProgressCallback, existingEvent: CalendarEvent, newEvent: CalendarEvent,
+	                           newAlarms: Array<AlarmInfo>): Promise<boolean> {
+		// We are not using this._findAttendee() because we want to search it on the event, before our modifications
+		const ownAttendee = existingEvent.attendees.find(a => this._mailAddresses.includes(a.address.address))
+		const selectedOwnAttendeeStatus = ownAttendee && this._guestStatuses().get(ownAttendee.address.address)
+		let sendPromise = Promise.resolve()
+		if (ownAttendee
+			&& selectedOwnAttendeeStatus !== CalendarAttendeeStatus.NEEDS_ACTION
+			&& ownAttendee.status !== selectedOwnAttendeeStatus
+		) {
+			ownAttendee.status = assertNotNull(selectedOwnAttendeeStatus)
+			const sendResponseModel = this._sendModelFactory()
+			const organizer = assertNotNull(existingEvent.organizer)
+			sendResponseModel.addRecipient("to", {name: organizer.name, address: organizer.address, contact: null})
+			sendPromise = this._distributor.sendResponse(newEvent, sendResponseModel, ownAttendee.address.address, this._responseTo,
+				assertNotNull(selectedOwnAttendeeStatus)
+			).then(() => sendResponseModel.dispose())
+		}
+		const p = sendPromise.then(() => this._saveEvent(newEvent, newAlarms))
+		showProgress(p)
+		return p.return(true)
+	}
+
+	selectGoing(going: CalendarAttendeeStatusEnum) {
+		if (this.canModifyOwnAttendance()) {
+			const ownAttendee = this._ownAttendee()
+			if (ownAttendee) {
+				this._guestStatuses(addMapEntry(this._guestStatuses(), ownAttendee.address, going))
+			} else if (this._eventType === EventType.OWN) {
+				const newOwnAttendee = createEncryptedMailAddress({address: firstThrow(this._mailAddresses)})
+				this._ownAttendee(newOwnAttendee)
+				this._guestStatuses(addMapEntry(this._guestStatuses(), newOwnAttendee.address, going))
+			}
 		}
 	}
 
@@ -832,9 +761,9 @@ export class CalendarEventViewModel {
 
 
 	updatePassword(guest: Guest, password: string) {
-		const inInite = this._inviteModel._bccRecipients.find((r) => r.mailAddress === guest.address.address)
-		if (inInite) {
-			this._inviteModel.setPassword(inInite, password)
+		const inInvite = this._inviteModel._bccRecipients.find((r) => r.mailAddress === guest.address.address)
+		if (inInvite) {
+			this._inviteModel.setPassword(inInvite, password)
 		}
 		const inUpdate = this._updateModel._bccRecipients.find((r) => r.mailAddress === guest.address.address)
 		if (inUpdate) {
@@ -860,7 +789,8 @@ export class CalendarEventViewModel {
 			if (!this.isConfidential()) {
 				return Promise.resolve(false)
 			}
-			if (this._eventType === EventType.INVITE) { // We can't receive invites from external users
+			if (this._eventType === EventType.INVITE) {
+				// We can't receive invites from secure external users, so we don't have to reply with password
 				return Promise.resolve(false)
 			}
 			return Promise.all([
@@ -903,6 +833,61 @@ export class CalendarEventViewModel {
 
 	isInvite(): boolean {
 		return this._eventType === EventType.INVITE
+	}
+
+	_initializeNewEvent(): CalendarEvent {
+		// We have to use existing instance to get all the final fields correctly
+		// Using clone feels hacky but otherwise we need to save all attributes of the existing event somewhere and if dialog is
+		// cancelled we also don't want to modify passed event
+		const newEvent = this.existingEvent ? clone(this.existingEvent) : createCalendarEvent()
+
+		let startDate = new Date(this.startDate)
+		let endDate = new Date(this.endDate)
+
+		if (this.allDay()) {
+			startDate = getAllDayDateUTCFromZone(startDate, this._zone)
+			endDate = getAllDayDateUTCFromZone(getStartOfNextDayWithZone(endDate, this._zone), this._zone)
+		} else {
+			const parsedStartTime = parseTime(this.startTime)
+			const parsedEndTime = parseTime(this.endTime)
+			if (!parsedStartTime || !parsedEndTime) {
+				throw new UserError("timeFormatInvalid_msg")
+			}
+			startDate = DateTime.fromJSDate(startDate, {zone: this._zone})
+			                    .set({hour: parsedStartTime.hours, minute: parsedStartTime.minutes})
+			                    .toJSDate()
+
+			// End date is never actually included in the event. For the whole day event the next day
+			// is the boundary. For the timed one the end time is the boundary.
+			endDate = DateTime.fromJSDate(endDate, {zone: this._zone})
+			                  .set({hour: parsedEndTime.hours, minute: parsedEndTime.minutes})
+			                  .toJSDate()
+		}
+
+		if (endDate.getTime() <= startDate.getTime()) {
+			throw new UserError("startAfterEnd_label")
+		}
+		newEvent.startTime = startDate
+		newEvent.description = this.note
+		newEvent.summary = this.summary()
+		newEvent.location = this.location()
+		newEvent.endTime = endDate
+		newEvent.invitedConfidentially = this.isConfidential()
+		newEvent.uid = this.existingEvent && this.existingEvent.uid
+			? this.existingEvent.uid
+			: generateUid(assertNotNull(this.selectedCalendar()).group._id, Date.now())
+		const repeat = this.repeat
+		if (repeat == null) {
+			newEvent.repeatRule = null
+		} else {
+			newEvent.repeatRule = this.createRepeatRule(newEvent, repeat)
+		}
+		newEvent.attendees = this.attendees().map((a) => createCalendarEventAttendee({
+			address: a.address,
+			status: a.status,
+		}))
+		newEvent.organizer = this.organizer
+		return newEvent
 	}
 }
 
