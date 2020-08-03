@@ -40,7 +40,7 @@ type CalendarMonthAttrs = {
 	onDateSelected: (date: Date) => mixed,
 	eventsForDays: Map<number, Array<CalendarEvent>>,
 	onNewEvent: (date: ?Date) => mixed,
-	onEventClicked: (event: CalendarEvent, event: Event) => mixed,
+	onEventClicked: (calendarEvent: CalendarEvent, clickEvent: Event) => mixed,
 	onChangeMonth: (next: boolean) => mixed,
 	amPmFormat: boolean,
 	startOfTheWeek: WeekStartEnum,
@@ -48,7 +48,7 @@ type CalendarMonthAttrs = {
 	hiddenCalendars: Set<Id>,
 }
 
-type SimplePosRest = {top: number, left: number, right: number}
+type SimplePosRect = {top: number, left: number, right: number}
 
 const dayHeight = () => styles.isDesktopLayout() ? 32 : 24
 const spaceBetweenEvents = () => styles.isDesktopLayout() ? 2 : 1
@@ -271,7 +271,7 @@ export class CalendarMonthView implements MComponent<CalendarMonthAttrs>, Lifecy
 		calendarDayWidth: number,
 		calendarDayHeight: number,
 		columnIndex: number,
-	): SimplePosRest {
+	): SimplePosRect {
 		const top = (size.calendar_line_height + spaceBetweenEvents()) * columnIndex + calendarDayHeight
 
 		const dayOfStartDateInWeek = getDiffInDaysFast(eventStart, firstDayOfWeek)

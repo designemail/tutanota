@@ -100,7 +100,7 @@ export class SendMailModel {
 	_objectURLs: Array<string>;
 	_blockExternalContent: boolean;
 	_mentionedInlineImages: Array<string>
-	// TODO
+	// TODO handle inline images when using SendMailModel for MailEditor
 	/** HTML elements which correspond to inline images. We need them to check that they are removed/remove them later */
 	_inlineImageElements: Array<HTMLElement>;
 
@@ -143,7 +143,7 @@ export class SendMailModel {
 
 		this._eventController.addEntityListener(this._entityEventReceived)
 
-		// TODO
+		// TODO allow selecting notification language when changing MailEditor
 		// let sortedLanguages = languages.slice().sort((a, b) => lang.get(a.textId).localeCompare(lang.get(b.textId)))
 		this._selectedNotificationLanguage = getAvailableLanguageCode(props.notificationMailLanguage || lang.code)
 
@@ -160,7 +160,7 @@ export class SendMailModel {
 		this._confidentialButtonState = !props.defaultUnconfidential
 		this._subject = stream("")
 
-		// TODO
+		// TODO detect changes
 		this._subject.map(() => this._mailChanged = true)
 
 		this._mailChanged = false
@@ -171,7 +171,6 @@ export class SendMailModel {
 	}
 
 	selectSender(senderAddress: string) {
-		// TODO: checks
 		this._senderAddress = senderAddress
 	}
 

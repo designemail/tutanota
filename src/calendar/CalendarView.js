@@ -253,14 +253,7 @@ export class CalendarView implements CurrentView {
 
 		this.viewSlider = new ViewSlider([this.sidebarColumn, this.contentColumn], "CalendarView")
 		// load all calendars. if there is no calendar yet, create one
-		this._calendarInfos = calendarModel.loadCalendarInfos().then(calendarInfos => {
-			if (calendarInfos.size === 0) {
-				return worker.addCalendar("").then(() => calendarModel.loadCalendarInfos())
-			} else {
-				return calendarInfos
-			}
-		}).tap(m.redraw)
-
+		this._calendarInfos = calendarModel.loadOrCreateCalendarInfo().tap(m.redraw)
 
 		this._calendarInvitations = []
 		this._updateCalendarInvitations()
@@ -870,7 +863,7 @@ export class CalendarView implements CurrentView {
 									this._loadMonthIfNeeded(selectedDate)
 									    .then(() => this._loadMonthIfNeeded(nextMonthDate))
 									    .then(() => this._loadMonthIfNeeded(previousMonthDate))
-								})
+								}).tap(() => m.redraw())
 							}
 						})
 					}

@@ -69,15 +69,15 @@ class Animations {
 	 */
 	add(targets: HTMLElement | HTMLElement[] | HTMLCollection<HTMLElement>, mutations: DomMutation | DomMutation[], options: ?{stagger?: number, delay?: number, easing?: EasingFunction, duration?: number}): AnimationPromise {
 		const targetsArray: Array<HTMLElement> = targets instanceof HTMLElement ? [targets] : Array.from(targets)
-		let mutation: DomMutation[]
+		let targetMutations: DomMutation[]
 		if (!(mutations instanceof Array)) {
-			mutation = [mutations]
+			targetMutations = [mutations]
 		} else {
-			mutation = mutations
+			targetMutations = mutations
 		}
 		let verifiedOptions = Animations.verifiyOptions(options)
 
-		const willChange = mutation.reduce((acc, mutation) => acc + " " + mutation.willChange(), "")
+		const willChange = targetMutations.map(mutation => mutation.willChange()).filter(willChange => willChange.length).join(" ")
 		targetsArray.forEach((t) => t.style.willChange = willChange)
 		const animations = []
 		const promise = new Promise((resolve) => {
@@ -87,7 +87,7 @@ class Animations {
 				if (verifiedOptions.stagger) {
 					delay += verifiedOptions.stagger * i
 				}
-				const animation = new Animation(targetsArray[i], mutation,
+				const animation = new Animation(targetsArray[i], targetMutations,
 					i === targetsArray.length - 1 ? resolve : null, delay, verifiedOptions.easing, verifiedOptions.duration)
 
 				animations.push(animation)

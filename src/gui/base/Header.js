@@ -72,6 +72,7 @@ class Header {
 		}
 
 
+		// load worker and search bar one after another because search bar uses worker.
 		asyncImport(typeof module !== "undefined" ?
 			module.id : __moduleName, `${env.rootPathPrefix}src/api/main/WorkerClient.js`)
 			.then(workerClientModule => {

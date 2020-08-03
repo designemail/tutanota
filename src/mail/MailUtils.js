@@ -366,7 +366,7 @@ export function getSortedCustomFolders(folders: MailFolder[]): MailFolder[] {
 }
 
 /**
- * @deprecated Stop grabbing singleton dependencies, it's bad for your health. use {@link getEnabledMailAddressesWithUser} instead
+ * @deprecated Avoid grabbing singleton dependencies, use {@link getEnabledMailAddressesWithUser} instead to explicitly show dependencies.
  */
 export function getEnabledMailAddresses(mailboxDetails: MailboxDetail): string[] {
 	return getEnabledMailAddressesWithUser(mailboxDetails, logins.getUserController().userGroupInfo)

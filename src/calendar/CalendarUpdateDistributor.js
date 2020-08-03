@@ -48,11 +48,12 @@ export class CalendarMailDistributor implements CalendarUpdateDistributor {
 	}
 
 	sendUpdate(event: CalendarEvent, sendMailModel: SendMailModel): Promise<void> {
+		const message = lang.get("eventUpdated_msg", {"{event}": event.summary})
 		return this._sendCalendarFile({
 			sendMailModel,
 			method: MailMethod.ICAL_REQUEST,
-			subject: lang.get("eventUpdated_msg", {"{event}": event.summary}),
-			body: makeInviteEmailBody(event, ""),
+			subject: message,
+			body: makeInviteEmailBody(event, message),
 			event,
 			sender: assertOrganizer(event).address
 		})
@@ -142,7 +143,7 @@ function summaryLine(event: CalendarEvent): string {
 }
 
 function whenLine(event: CalendarEvent): string {
-	const duration = formatEventDuration(event, getTimeZone())
+	const duration = formatEventDuration(event, getTimeZone(), true)
 	return newLine(lang.get("when_label"), duration)
 }
 

@@ -159,7 +159,7 @@ export function showCalendarEventDialog(date: Date, calendars: Map<Id, CalendarI
 				const onclose = (positive) => positive
 					? resolve("yes")
 					: resolve("cancel")
-				alertDialog = Dialog.alert("sendUpdates_msg", [cancelButton, noButton, yesButton], onclose)
+				alertDialog = Dialog.confirmMultiple("sendUpdates_msg", [cancelButton, noButton, yesButton], onclose)
 			})
 		}
 

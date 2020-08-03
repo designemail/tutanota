@@ -27,11 +27,8 @@ import {Logger, replaceNativeLogger} from "./api/common/Logger"
 import {ButtonType} from "./gui/base/ButtonN"
 import {changeSystemLanguage} from "./native/SystemApp"
 
-console.log("app.js everything imported")
-
 assertMainOrNodeBoot()
 bootFinished()
-console.log("app.js boot finished")
 
 replaceNativeLogger(window, new Logger())
 
@@ -251,8 +248,6 @@ let initialized = lang.init(en).then(() => {
 	const workerPromise = _asyncImport("src/api/main/WorkerClient.js")
 		.then(module => module.worker)
 	workerPromise.then((worker) => {
-		console.log("app.js worker imported")
-		worker.initialized.then(() => console.log("worker initialized"))
 		_asyncImport("src/gui/InfoMessageHandler.js")
 	})
 

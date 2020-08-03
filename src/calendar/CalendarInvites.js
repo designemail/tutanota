@@ -4,13 +4,13 @@ import {worker} from "../api/main/WorkerClient"
 import {showCalendarEventDialog} from "./CalendarEventEditDialog"
 import type {CalendarEvent} from "../api/entities/tutanota/CalendarEvent"
 import type {File as TutanotaFile} from "../api/entities/tutanota/File"
-import {calendarModel, loadCalendarInfos} from "./CalendarModel"
+import {calendarModel} from "./CalendarModel"
 import {locator} from "../api/main/MainLocator"
 import type {CalendarEventAttendee} from "../api/entities/tutanota/CalendarEventAttendee"
 import type {CalendarAttendeeStatusEnum, CalendarMethodEnum} from "../api/common/TutanotaConstants"
 import {CalendarMethod, getAsEnumValue} from "../api/common/TutanotaConstants"
 import {assertNotNull, clone} from "../api/common/utils/Utils"
-import {getTimeZone, incrementSequence} from "./CalendarUtils"
+import {findPrivateCalendar, getTimeZone, incrementSequence} from "./CalendarUtils"
 import type {CalendarInfo} from "./CalendarView"
 import {logins} from "../api/main/LoginController"
 import {SendMailModel} from "../mail/SendMailModel"
@@ -18,38 +18,6 @@ import type {Mail} from "../api/entities/tutanota/Mail"
 import {calendarUpdateDistributor} from "./CalendarUpdateDistributor"
 import {Dialog} from "../gui/base/Dialog"
 import {UserError} from "../api/common/error/UserError"
-import {firstThrow} from "../api/common/utils/ArrayUtils"
-
-function loadOrCreateCalendarInfo(): Promise<Map<Id, CalendarInfo>> {
-	return loadCalendarInfos()
-		.then((calendarInfo) => (!logins.isInternalUserLoggedIn() || calendarInfo.size)
-			? calendarInfo
-			: worker.addCalendar("").then(() => loadCalendarInfos()))
-}
-
-function getOrCreatePrivateCalendar(): Promise<?CalendarInfo> {
-	if (!logins.isInternalUserLoggedIn()) {
-		return Promise.resolve(null)
-	} else {
-		return loadCalendarInfos()
-			.then((calendarInfo) => {
-				// addCalendar() has special hack to update memberships immediately so it's safe to load it right away.
-				// Otherwise membership might now have been there yet.
-				return findPrivateCalendar(calendarInfo) || worker.addCalendar("")
-				                                                  .then(() => loadCalendarInfos())
-				                                                  .then(findPrivateCalendar)
-			})
-	}
-}
-
-function findPrivateCalendar(calendarInfo: Map<Id, CalendarInfo>): ?CalendarInfo {
-	for (const calendar of calendarInfo.values()) {
-		if (!calendar.shared) {
-			return calendar
-		}
-	}
-	return null
-}
 
 function getParsedEvent(fileData: DataFile): ?{method: CalendarMethodEnum, event: CalendarEvent, uid: string} {
 	try {
@@ -69,7 +37,7 @@ function getParsedEvent(fileData: DataFile): ?{method: CalendarMethodEnum, event
 
 export function showEventDetails(event: CalendarEvent, mail: ?Mail) {
 	return Promise.all([
-		loadOrCreateCalendarInfo(),
+		calendarModel.loadOrCreateCalendarInfo(),
 		locator.mailModel.getUserMailboxDetails(),
 		getLatestEvent(event)
 	]).then(([calendarInfo, mailboxDetails, latestEvent]) => {
@@ -84,8 +52,11 @@ export function getEventFromFile(file: TutanotaFile): Promise<?CalendarEvent> {
 	})
 }
 
+/**
+ * Returns the latest version for the given event by uid. If the event is not in any calendar (because it has not been stored yet, e.g. in case of invite)
+ * the given event is returned.
+ */
 export function getLatestEvent(event: CalendarEvent): Promise<CalendarEvent> {
-
 	const uid = event.uid
 	if (uid) {
 		return worker.getEventByUid(uid).then((existingEvent) => {
@@ -101,6 +72,9 @@ export function getLatestEvent(event: CalendarEvent): Promise<CalendarEvent> {
 	}
 }
 
+/**
+ * Sends a quick reply for the given event and saves the event to the first private calendar.
+ */
 export function replyToEventInvitation(
 	event: CalendarEvent,
 	attendee: CalendarEventAttendee,
@@ -113,7 +87,7 @@ export function replyToEventInvitation(
 	eventClone.sequence = incrementSequence(eventClone.sequence)
 
 	return Promise.all([
-		getOrCreatePrivateCalendar(),
+		calendarModel.loadOrCreateCalendarInfo().then(findPrivateCalendar),
 		locator.mailModel.getMailboxDetailsForMail(previousMail)
 	]).then(([calendar, mailboxDetails]) => {
 		const sendMailModel = new SendMailModel(logins, locator.mailModel, locator.contactModel, locator.eventController, mailboxDetails)
@@ -122,6 +96,7 @@ export function replyToEventInvitation(
 			.catch(UserError, (e) => Dialog.error(() => e.message))
 			.then(() => {
 				if (calendar) {
+					// if the owner group is set there is an existing event already so just update
 					if (event._ownerGroup) {
 						return calendarModel.loadAlarms(event.alarmInfos, logins.getUserController().user)
 						                    .then((alarms) => {

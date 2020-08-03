@@ -338,42 +338,29 @@ export class Dialog {
 	}
 
 
+	/**
+	 * Simpler version of {@link Dialog#confirmMultiple} with just two options: no and yes (or another confirmation).
+	 * @return Promise, which is resolved with user selection - true for confirm, false for cancel.
+	 */
 	static confirm(messageIdOrMessageFunction: TranslationKey | lazy<string>, confirmId: TranslationKey = "ok_action"): Promise<boolean> {
 		return new Promise(resolve => {
-			let dialog: Dialog
-			const closeAction = conf => {
-				dialog.close()
-				setTimeout(() => resolve(conf), DefaultAnimationTime)
-			}
 			const buttonAttrs: Array<ButtonAttrs> = [
-				{label: "cancel_action", click: () => closeAction(false), type: ButtonType.Secondary},
-				{label: confirmId, click: () => closeAction(true), type: ButtonType.Primary}
+				{label: "cancel_action", click: () => resolve(false), type: ButtonType.Secondary},
+				{label: confirmId, click: () => resolve(true), type: ButtonType.Primary}
 			]
-
-			dialog = new Dialog(DialogType.Alert, {
-				view: () => [
-					m("#dialog-message.dialog-contentButtonsBottom.text-break.text-prewrap.selectable",
-						lang.getMaybeLazy(messageIdOrMessageFunction)),
-					m(".flex-center.dialog-buttons", buttonAttrs.map(a => m(ButtonN, a)))
-				]
-			}).setCloseHandler(
-				() => closeAction(false)
-			).addShortcut({
-				key: Keys.ESC,
-				shift: false,
-				exec: () => closeAction(false),
-				help: "cancel_action"
-			}).addShortcut({
-				key: Keys.RETURN,
-				shift: false,
-				exec: () => closeAction(true),
-				help: neverNull(confirmId) //ok?
-			}).show()
+			Dialog.confirmMultiple(messageIdOrMessageFunction, buttonAttrs, resolve)
 		})
 	}
 
-	static alert(messageIdOrMessageFunction: TranslationKey | lazy<string>, buttons: $ReadOnlyArray<ButtonAttrs>,
-	             onclose?: (positive: boolean) => mixed
+	/**
+	 * Show a dialog with multiple selection options below the message.
+	 * @param messageIdOrMessageFunction which displayed in the body
+	 * @param buttons which are displayed below
+	 * @param onclose which is called on shortcut or when dialog is closed any other way (e.g. back navigation). Not called when pressing
+	 * one of the buttons.
+	 */
+	static confirmMultiple(messageIdOrMessageFunction: TranslationKey | lazy<string>, buttons: $ReadOnlyArray<ButtonAttrs>,
+	                       onclose?: (positive: boolean) => mixed
 	): Dialog {
 		let dialog: Dialog
 		const closeAction = (positive) => {

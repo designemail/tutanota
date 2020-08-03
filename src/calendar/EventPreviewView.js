@@ -3,17 +3,12 @@ import type {CalendarEvent} from "../api/entities/tutanota/CalendarEvent"
 import m from "mithril"
 import {Icon} from "../gui/base/Icon"
 import {theme} from "../gui/theme"
-import {RepeatPeriod} from "../api/common/TutanotaConstants"
-import {getAllDayDateLocal, isAllDayEvent} from "../api/common/utils/CommonCalendarUtils"
-import {formatDate, formatDateTime, formatDateWithMonth, formatTime} from "../misc/Formatter"
 import {BootIcons} from "../gui/base/icons/BootIcons"
 import {Icons} from "../gui/base/icons/Icons"
-import {isSameDayOfDate} from "../api/common/utils/DateUtils"
-import {incrementByRepeatPeriod} from "./CalendarModel"
-import {getTimeZone} from "./CalendarUtils"
 import {memoized} from "../api/common/utils/Utils"
 import {htmlSanitizer} from "../misc/HtmlSanitizer"
 import {iconForAttendeeStatus} from "./CalendarEventEditDialog"
+import {formatEventDuration, getTimeZone} from "./CalendarUtils"
 
 export type Attrs = {
 	event: CalendarEvent,
@@ -29,7 +24,7 @@ export class EventPreviewView implements MComponent<Attrs> {
 				m(".flex.pb-s.items-center", [renderSectionIndicator(BootIcons.Calendar), m(".h3", event.summary)]),
 				m(".flex.pb-s.items-center", [
 						renderSectionIndicator(Icons.Time),
-						m(".align-self-center", formatEventDuration(event))
+						m(".align-self-center", formatEventDuration(event, getTimeZone(), false))
 					]
 				),
 				event.location ? m(".flex.pb-s.items-center", [renderSectionIndicator(Icons.Pin), event.location]) : null,
@@ -65,22 +60,4 @@ function renderSectionIndicator(icon, style: {[string]: any} = {}) {
 			display: "block"
 		}, style)
 	}))
-}
-
-function formatEventDuration(event: CalendarEvent) {
-	if (isAllDayEvent(event)) {
-		const startTime = getAllDayDateLocal(event.startTime)
-		const endTime = incrementByRepeatPeriod(getAllDayDateLocal(event.endTime), RepeatPeriod.DAILY, -1, getTimeZone())
-		if (isSameDayOfDate(startTime, endTime)) {
-			return formatDateWithMonth(startTime)
-		} else {
-			return `${formatDateWithMonth(startTime)} - ${(formatDateWithMonth(endTime))}`
-		}
-	} else {
-		if (isSameDayOfDate(event.startTime, event.endTime)) {
-			return `${formatDate(event.startTime)}, ${formatTime(event.startTime)} - ${formatTime(event.endTime)}`
-		} else {
-			return `${formatDateTime(event.startTime)} - ${formatDateTime(event.endTime)}`
-		}
-	}
 }

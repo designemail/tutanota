@@ -1,5 +1,5 @@
 //@flow
-import {getStartOfDay, incrementDate, isSameDay} from "../api/common/utils/DateUtils"
+import {getStartOfDay, incrementDate, isSameDay, isSameDayOfDate} from "../api/common/utils/DateUtils"
 import {pad} from "../api/common/utils/StringUtils"
 import type {
 	CalendarAttendeeStatusEnum,
@@ -14,6 +14,7 @@ import {
 	EventTextTimeOption,
 	getWeekStart,
 	GroupType,
+	RepeatPeriod,
 	ShareCapability,
 	WeekStart
 } from "../api/common/TutanotaConstants"
@@ -36,6 +37,8 @@ import type {User} from "../api/entities/sys/User"
 import type {Group} from "../api/entities/sys/Group"
 import type {GroupMembership} from "../api/entities/sys/GroupMembership"
 import {isColorLight} from "../gui/Color"
+import type {CalendarInfo} from "./CalendarView"
+import {incrementByRepeatPeriod} from "./CalendarModel"
 
 assertMainOrNode()
 
@@ -545,25 +548,25 @@ export function hasAlarmsForTheUser(event: CalendarEvent): boolean {
 	return event.alarmInfos.some(([listId]) => isSameId(listId, useAlarmList))
 }
 
-export function formatEventDuration(event: CalendarEvent, zone: string) {
-	const startTime = getEventStart(event, zone)
-	const endTime = getEventEnd(event, zone)
+export function formatEventDuration(event: CalendarEvent, zone: string, includeTimezone: boolean) {
 	if (isAllDayEvent(event)) {
+		const startTime = getEventStart(event, zone)
 		const startString = formatDateWithMonth(startTime)
-		if (getDiffInDays(endTime, startTime) === 1) {
+		const endTime = incrementByRepeatPeriod(getEventEnd(event, zone), RepeatPeriod.DAILY, -1, zone)
+		if (isSameDayOfDate(startTime, endTime)) {
 			return `${lang.get("allDay_label")}, ${startString}`
 		} else {
 			return `${lang.get("allDay_label")}, ${startString} - ${formatDateWithMonth(endTime)}`
 		}
 	} else {
-		const startString = formatDateTime(startTime)
+		const startString = formatDateTime(event.startTime)
 		let endString
-		if (isSameDay(startTime, endTime)) {
-			endString = formatTime(endTime)
+		if (isSameDay(event.startTime, event.endTime)) {
+			endString = formatTime(event.endTime)
 		} else {
-			endString = formatDateTime(endTime)
+			endString = formatDateTime(event.endTime)
 		}
-		return `${startString} - ${endString} ${getTimeZone()}`
+		return `${startString} - ${endString} ${includeTimezone ? getTimeZone() : ""}`
 	}
 }
 
@@ -596,4 +599,13 @@ export function getNextHalfHour() {
 		date.setMinutes(30)
 	}
 	return date
+}
+
+export function findPrivateCalendar(calendarInfo: Map<Id, CalendarInfo>): ?CalendarInfo {
+	for (const calendar of calendarInfo.values()) {
+		if (!calendar.shared) {
+			return calendar
+		}
+	}
+	return null
 }

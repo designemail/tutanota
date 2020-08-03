@@ -1,7 +1,7 @@
 //@flow
 import type {CalendarMonthTimeRange} from "./CalendarUtils"
 import {
-	assignEventId,
+	assignEventId, findPrivateCalendar,
 	getAllDayDateForTimezone,
 	getAllDayDateUTCFromZone,
 	getDiffInDays,
@@ -289,49 +289,6 @@ function getValidTimeZone(zone: string, fallback: ?string): string {
 	}
 }
 
-export function loadCalendarInfos(): Promise<Map<Id, CalendarInfo>> {
-	const userId = logins.getUserController().user._id
-	return load(UserTypeRef, userId)
-		.then(user => {
-			const calendarMemberships = user.memberships.filter(m => m.groupType === GroupType.Calendar);
-			const notFoundMemberships = []
-			return Promise
-				.map(calendarMemberships, (membership) => Promise
-					.all([
-						load(CalendarGroupRootTypeRef, membership.group),
-						load(GroupInfoTypeRef, membership.groupInfo),
-						load(GroupTypeRef, membership.group)
-					])
-					.catch(NotFoundError, () => {
-						notFoundMemberships.push(membership)
-						return null
-					})
-				)
-				.then((groupInstances) => {
-					const calendarInfos: Map<Id, CalendarInfo> = new Map()
-					groupInstances.filter(Boolean)
-					              .forEach(([groupRoot, groupInfo, group]) => {
-						              calendarInfos.set(groupRoot._id, {
-							              groupRoot,
-							              groupInfo,
-							              shortEvents: [],
-							              longEvents: new LazyLoaded(() => loadAll(CalendarEventTypeRef, groupRoot.longEvents), []),
-							              group: group,
-							              shared: !isSameId(group.user, userId)
-						              })
-					              })
-
-					// cleanup inconsistent memberships
-					Promise.each(notFoundMemberships, (notFoundMembership) => {
-						const data = createMembershipRemoveData({user: userId, group: notFoundMembership.group})
-						return serviceRequestVoid(SysService.MembershipService, HttpMethod.DELETE, data)
-					})
-					return calendarInfos
-				})
-		})
-		.tap(() => m.redraw())
-}
-
 // Complete as needed
 export interface CalendarModel {
 	init(): Promise<void>;
@@ -349,6 +306,8 @@ export interface CalendarModel {
 
 	/** Load map from group/groupRoot ID to the calendar info */
 	loadCalendarInfos(): Promise<Map<Id, CalendarInfo>>;
+
+	loadOrCreateCalendarInfo(): Promise<Map<Id, CalendarInfo>>;
 }
 
 export class CalendarModelImpl implements CalendarModel {
@@ -438,6 +397,13 @@ export class CalendarModelImpl implements CalendarModel {
 			})
 	}
 
+	loadOrCreateCalendarInfo(): Promise<Map<Id, CalendarInfo>> {
+		return this.loadCalendarInfos()
+		           .then((calendarInfo) => (!this._logins.isInternalUserLoggedIn() || findPrivateCalendar(calendarInfo))
+			           ? calendarInfo
+			           : this._worker.addCalendar("").then(() => this.loadCalendarInfos()))
+	}
+
 	_doCreate(event: CalendarEvent, zone: string, groupRoot: CalendarGroupRoot, alarmInfos: Array<AlarmInfo>,
 	          existingEvent: ?CalendarEvent
 	): Promise<void> {
@@ -470,7 +436,7 @@ export class CalendarModelImpl implements CalendarModel {
 		})
 	}
 
-	_handleCalendarEventUpdate(update: CalendarEventUpdate) {
+	_handleCalendarEventUpdate(update: CalendarEventUpdate): Promise<void> {
 		return load(FileTypeRef, update.file)
 			.then((file) => this._worker.downloadFileContent(file))
 			.then((dataFile: DataFile) => parseCalendarFile(dataFile))
@@ -478,17 +444,21 @@ export class CalendarModelImpl implements CalendarModel {
 			.then(() => erase(update))
 	}
 
-	// We need to separate processing from talking to the worker
-
-	processCalendarUpdate(sender: string, calendarData: ParsedCalendarData) {
+	/**
+	 * Processing calendar update - bring events in calendar up-to-date with updates sent via email.
+	 * Calendar updates are currently processed for REPLY, REQUEST and CANCEL calendar types. For REQUEST type the update is only processed
+	 * if there is an existing event.
+	 * For REPLY we update attendee status, for REQUEST we update event and for CANCEL we delete existing event.
+	 */
+	processCalendarUpdate(sender: string, calendarData: ParsedCalendarData): Promise<void> {
 		if (calendarData.contents.length !== 1) {
 			console.log(`Calendar update with ${calendarData.contents.length} events, ignoring`)
-			return
+			return Promise.resolve()
 		}
 		const {event} = calendarData.contents[0]
 		if (event == null || event.uid == null) {
 			console.log("Invalid event: ", event)
-			return
+			return Promise.resolve()
 		}
 		const uid = event.uid
 
@@ -496,32 +466,26 @@ export class CalendarModelImpl implements CalendarModel {
 			// Process it
 			return this._worker.getEventByUid(uid).then((dbEvent) => {
 				if (dbEvent == null) {
-					console.log("event was not found", uid)
+					// event was not found
 					return
 				}
+				// first check if the sender of the email is in the attendee list
 				const replyAttendee = event.attendees.find((a) => a.address.address === sender)
 				if (replyAttendee == null) {
 					console.log("Sender is not among attendees, ignoring", replyAttendee)
 					return
 				}
 
-				const updatedEvent = clone(dbEvent)
-				const dbAttendee = updatedEvent.attendees.find((a) =>
+				const newEvent = clone(dbEvent)
+				// check if the attendee is still in the attendee list of the latest event
+				const dbAttendee = newEvent.attendees.find((a) =>
 					replyAttendee.address.address === a.address.address)
 				if (dbAttendee == null) {
 					console.log("Attendee was not found", dbEvent._id, replyAttendee)
 					return
 				}
 				dbAttendee.status = replyAttendee.status
-				console.log(`updating event with reply status, uid: ${String(updatedEvent.uid)}, id: ${JSON.stringify(updatedEvent._id)}, attendee: ${replyAttendee.address.address}, status: ${dbAttendee.status}`)
-
-				return Promise.all([
-					this.loadAlarms(dbEvent.alarmInfos, this._logins.getUserController().user),
-					_loadEntity(CalendarGroupRootTypeRef, assertNotNull(dbEvent._ownerGroup), null, this._worker)
-				]).then(([alarms, groupRoot]) => {
-					const alarmInfos = alarms.map((a) => a.alarmInfo)
-					return this.updateEvent(updatedEvent, alarmInfos, "", groupRoot, dbEvent)
-				})
+				return this._updateEvent(dbEvent, newEvent)
 			})
 		} else if (calendarData.method === CalendarMethod.REQUEST) { // Either initial invite or update
 			return this._worker.getEventByUid(uid).then((dbEvent) => {
@@ -533,24 +497,16 @@ export class CalendarModelImpl implements CalendarModel {
 					}
 					const newEvent = clone(dbEvent)
 					newEvent.startTime = event.startTime
+					newEvent.endTime = event.endTime
 					newEvent.attendees = event.attendees
 					newEvent.summary = event.summary
 					newEvent.sequence = event.sequence
 					newEvent.location = event.location
 					newEvent.description = event.description
-					newEvent.endTime = event.endTime
 					newEvent.organizer = event.organizer
 					newEvent.repeatRule = event.repeatRule
-
-					console.log("Updating event", dbEvent.uid, dbEvent._id)
-					return Promise.all([
-						this.loadAlarms(dbEvent.alarmInfos, this._logins.getUserController().user),
-						_loadEntity(CalendarGroupRootTypeRef, assertNotNull(dbEvent._ownerGroup), null, this._worker)
-					]).then(([alarms, groupRoot]) => {
-						const alarmInfos = alarms.map((a) => a.alarmInfo)
-						return this.updateEvent(newEvent, alarmInfos, "", groupRoot, dbEvent)
-						           .catch(PreconditionFailedError, () => console.log("Precondition error when processing calendar update"))
-					})
+					//console.log("Updating event", dbEvent.uid, dbEvent._id)
+					return this._updateEvent(dbEvent, newEvent)
 				}
 			})
 		} else if (calendarData.method === CalendarMethod.CANCEL) {
@@ -560,11 +516,24 @@ export class CalendarModelImpl implements CalendarModel {
 						console.log("CANCEL sent not by organizer, ignoring")
 						return
 					}
-					console.log("Deleting cancelled event", uid, dbEvent._id)
+					//console.log("Deleting cancelled event", uid, dbEvent._id)
 					return _eraseEntity(dbEvent, this._worker)
 				}
 			})
+		} else {
+			return Promise.resolve()
 		}
+	}
+
+	_updateEvent(dbEvent: CalendarEvent, newEvent: CalendarEvent): Promise<void> {
+		return Promise.all([
+			this.loadAlarms(dbEvent.alarmInfos, this._logins.getUserController().user),
+			_loadEntity(CalendarGroupRootTypeRef, assertNotNull(dbEvent._ownerGroup), null, this._worker)
+		]).then(([alarms, groupRoot]) => {
+			const alarmInfos = alarms.map((a) => a.alarmInfo)
+			return this.updateEvent(newEvent, alarmInfos, "", groupRoot, dbEvent)
+			           .catch(PreconditionFailedError, () => console.log("Precondition error when processing calendar update"))
+		})
 	}
 
 	init(): Promise<void> {
@@ -721,3 +690,4 @@ export const calendarModel = new CalendarModelImpl(new Notifications, locator.ev
 if (replaced) {
 	Object.assign(calendarModel, replaced.calendarModel)
 }
+

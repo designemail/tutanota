@@ -350,7 +350,7 @@ export class MailViewer {
 								},
 								onsubmit: (event: Event) => this._confirmSubmit(event),
 								style: {'line-height': this._bodyLineHeight, 'transform-origin': 'top left'},
-							}, (this._htmlBody == null && !this._errorOccurred)
+							}, (this._mailBody == null && !this._errorOccurred)
 								? m(".progress-panel.flex-v-center.items-center", {
 									style: {
 										height: '200px'
@@ -908,7 +908,6 @@ export class MailViewer {
 	}
 
 	_renderAttachments(): Children {
-		// TODO: Disable it for calendar file
 		if (this._loadingAttachments) {
 			return m(".flex", [
 				m(".flex-v-center.pl-button", progressIcon()),

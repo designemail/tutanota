@@ -3,7 +3,7 @@ import {downcast, neverNull} from "../api/common/utils/Utils"
 import {DateTime, IANAZone} from "luxon"
 import {createCalendarEvent} from "../api/entities/tutanota/CalendarEvent"
 import type {AlarmIntervalEnum, EndTypeEnum, RepeatPeriodEnum} from "../api/common/TutanotaConstants"
-import {AlarmInterval, EndType, RepeatPeriod, reverse} from "../api/common/TutanotaConstants"
+import {AlarmInterval, CalendarMethod, EndType, RepeatPeriod, reverse} from "../api/common/TutanotaConstants"
 import {createRepeatRule} from "../api/entities/sys/RepeatRule"
 import {createAlarmInfo} from "../api/entities/sys/AlarmInfo"
 import {DAY_IN_MILLIS} from "../api/common/utils/DateUtils"
@@ -361,12 +361,12 @@ function oneDayDurationEnd(startTime: Date, allDay: boolean, tzId: ?string, zone
 	               .toJSDate()
 }
 
+const MAILTO_PREFIX = "mailto:"
+
 export function parseCalendarEvents(icalObject: ICalObject, zone: string): ParsedCalendarData {
 	const methodProp = icalObject.properties.find((prop) => prop.name === "METHOD")
-	if (!methodProp) {
-		throw new ParserError("METHOD is not defined on the calendar")
-	}
-	const method = methodProp.value
+
+	const method = methodProp ? methodProp.value : CalendarMethod.PUBLISH
 	const eventObjects = icalObject.children.filter((obj) => obj.type === "VEVENT")
 
 	const contents = eventObjects.map((eventObj) => {
@@ -441,13 +441,13 @@ export function parseCalendarEvents(icalObject: ICalObject, zone: string): Parse
 		let attendees = []
 		eventObj.properties.forEach((property) => {
 			if (property.name === "ATTENDEE") {
-				if (!property.value.startsWith("mailto:")) return
+				if (!property.value.startsWith(MAILTO_PREFIX)) return
 				const status = parstatToCalendarAttendeeStatus[property.params["PARTSTAT"]]
 				if (!status) return
 
 				attendees.push(createCalendarEventAttendee({
 					address: createEncryptedMailAddress({
-						address: property.value.substring("mailto:".length),
+						address: property.value.substring(MAILTO_PREFIX.length),
 						name: property.params["CN"],
 					}),
 					status,
@@ -456,9 +456,9 @@ export function parseCalendarEvents(icalObject: ICalObject, zone: string): Parse
 		})
 		event.attendees = attendees
 		const organizerProp = eventObj.properties.find(p => p.name === "ORGANIZER")
-		if (organizerProp && organizerProp.value.startsWith("mailto:")) {
+		if (organizerProp && organizerProp.value.startsWith(MAILTO_PREFIX)) {
 			event.organizer = createEncryptedMailAddress({
-				address: organizerProp.value.substring("mailto:".length),
+				address: organizerProp.value.substring(MAILTO_PREFIX.length),
 				name: organizerProp.params["name"],
 			})
 		}
