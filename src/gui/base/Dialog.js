@@ -344,11 +344,15 @@ export class Dialog {
 	 */
 	static confirm(messageIdOrMessageFunction: TranslationKey | lazy<string>, confirmId: TranslationKey = "ok_action"): Promise<boolean> {
 		return new Promise(resolve => {
+			const closeAction = conf => {
+				dialog.close()
+				setTimeout(() => resolve(conf), DefaultAnimationTime)
+			}
 			const buttonAttrs: Array<ButtonAttrs> = [
-				{label: "cancel_action", click: () => resolve(false), type: ButtonType.Secondary},
-				{label: confirmId, click: () => resolve(true), type: ButtonType.Primary}
+				{label: "cancel_action", click: () => closeAction(false), type: ButtonType.Secondary},
+				{label: confirmId, click: () => closeAction(true), type: ButtonType.Primary},
 			]
-			Dialog.confirmMultiple(messageIdOrMessageFunction, buttonAttrs, resolve)
+			const dialog = Dialog.confirmMultiple(messageIdOrMessageFunction, buttonAttrs, resolve)
 		})
 	}
 
