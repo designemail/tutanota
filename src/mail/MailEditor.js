@@ -341,7 +341,13 @@ export class MailEditor {
 				m(".row", m(this.subject)),
 				m(".flex-start.flex-wrap.ml-negative-bubble", this._getAttachmentButtons().map((a) => m(ButtonN, a))),
 				this._attachments.length > 0 ? m("hr.hr") : null,
-				this._showToolbar ? m(this._richTextToolbar) : null,
+				this._showToolbar
+					// Toolbar is not removed from DOM directly, only it's parent (array) is so we have to animate it manually.
+					// m.fragment() gives us a vnode without actual DOM element so that we can run callback on removal
+					? m.fragment({
+						onbeforeremove: ({dom}) => this._richTextToolbar._animate(dom.children[0], false)
+					}, [m(this._richTextToolbar), m("hr.hr")])
+					: null,
 				m(".pt-s.text.scroll-x.break-word-links", {onclick: () => this._editor.focus()}, m(this._editor)),
 				m(".pb")
 			])

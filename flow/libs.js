@@ -64,6 +64,8 @@ declare module 'mithril' {
 
 		redraw(): void;
 
+		fragment<Attrs: $ReadOnly<{[?string]: any}>>(attributes: Attrs, children?: Children): Vnode<any>;
+
 		trust(html: string): any;
 
 		withAttr(attrName: string, callback: Function): Function;

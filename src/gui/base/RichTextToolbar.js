@@ -181,7 +181,7 @@ export class RichTextToolbar {
 				this.selectedSize(size.font_size_base)
 			}
 
-			return m(".elevated-bg.overflow-hidden.pb-2", {
+			return m(".elevated-bg.overflow-hidden", {
 					style: {
 						"top": '0px',
 						"position": client.browser === BrowserType.SAFARI
@@ -199,25 +199,25 @@ export class RichTextToolbar {
 
 	oncreate(vnode: Vnode<any>) {
 		vnode.dom.style.height = "0"
-		this._animate(vnode, true)
+		this._animate(vnode.dom, true)
 	}
 
 	onbeforeremove(vnode: Vnode<any>) {
-		return this._animate(vnode, false)
+		return this._animate(vnode.dom, false)
 	}
 
-	_animate(vnode: Vnode<any>, appear: boolean): Promise<*> {
-		let childHeight = Array.from(vnode.dom.children)
+	_animate(dom: HTMLElement, appear: boolean): Promise<*> {
+		let childHeight = Array.from(dom.children)
 		                       .map((domElement: HTMLElement) => domElement.offsetHeight)
 		                       .reduce((current: number, previous: number) => Math.max(current, previous), 0)
 		return animations
-			.add(vnode.dom, [
+			.add(dom, [
 				height(appear ? 0 : childHeight, appear ? childHeight : 0),
 				appear ? opacity(0, 1, false) : opacity(1, 0, false)
 			])
 			.then(() => {
 				if (appear) {
-					vnode.dom.style.height = ''
+					dom.style.height = ''
 				}
 			})
 	}

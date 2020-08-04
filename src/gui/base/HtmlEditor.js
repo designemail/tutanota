@@ -122,6 +122,7 @@ export class HtmlEditor {
 							(this._editor.isEnabled() && this._richToolbarOptions.enabled) ? m(toolbar) : null,
 							this._editor.isEnabled() && injections ? injections() : null,
 						]),
+						this._editor.isEnabled() ? m("hr.hr.mb-s") : null,
 						m(this._editor)
 					]) : null,
 					this._mode() === Mode.HTML ? m(".html", m("textarea.input-area.selectable", {
